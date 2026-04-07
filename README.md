@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="assets/logo.png" width="200" alt="Oh My Vibe Userscript Logo">
+  <img src="assets/logo.png" width="300" alt="Oh My Vibecode Logo">
 </p>
 
-# Oh My Vibe Userscript 🌈
+# Oh My Vibecode 🛡️
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Scripts Count](https://img.shields.io/badge/scripts-5-orange.svg)]()
 
-**Oh My Vibe Userscript** là kho tổng hợp các bộ script Tampermonkey giúp tối ưu hóa trải nghiệm, tăng năng suất và mang lại "vibe" hiện đại cho các trang web bạn sử dụng hàng ngày.
+**Oh My Vibecode** là kho tổng hợp các bộ userscript chất lượng cao, được tinh chỉnh theo phong cách **Vibecode** để tối ưu hóa trải nghiệm người dùng và tăng năng suất lập trình/lướt web.
 
 ## ✨ Các bộ script hiện tại
 
@@ -38,13 +38,13 @@
 
 ## 🛠️ Phát triển
 
-Tất cả script đều được phát triển bằng JavaScript thuần túy, ưu tiên hiệu năng và tính ổn định.
+Tất cả script trong bộ sưu tập này tuân thủ các tiêu chuẩn mã sạch, hiệu suất cao và được bảo trì thường xuyên.
 
 ### Cấu trúc project
 
 ```text
 .
-├── assets/         # Tài nguyên hình ảnh, logo
+├── assets/         # Logo và tài nguyên hình ảnh
 ├── scripts/        # Danh sách script đã phân loại
 │   ├── academic/   # Các script hỗ trợ học tập
 │   ├── social/     # Các script mạng xã hội
