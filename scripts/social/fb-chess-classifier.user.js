@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.16
+// @version      1.0.17
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -105,7 +105,7 @@
         else result = CLASSIFICATIONS.GOOD;
 
         // Luck Promotion
-        if (score > 0 && Math.random() < 0.05) {
+        if (score > 0 && Math.random() < 0.01) {
             return CLASSIFICATIONS.BRILLIANT;
         }
 
@@ -197,6 +197,8 @@
     function processElement(el) {
         if (el.dataset.chessEvaluated) return;
         
+        if (el.classList.contains('xi81zsa') || el.closest('.xi81zsa')) return;
+
         // Exclude input fields and contenteditable elements
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
             return;
@@ -232,7 +234,9 @@
         }
 
         const text = (el.innerText || el.textContent || '').trim();
-        if (text.length < 2 || text.length >= 500) return;
+        if (text.length < 4 || text.length >= 500) return;
+
+        if (/^(\d+[smhdwy]+|vừa xong)$/i.test(text)) return;
 
         // Link Exclusion
         // Refined to avoid matching trailing dots (like hello...)
@@ -246,26 +250,7 @@
             el.dataset.chessEvaluated = 'true';
             const badge = createBadge(cls);
             
-            // Try to append right after the last text node to prevent line breaks
-            let lastTextNode = null;
-            const treeWalker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
-            let currentNode;
-            while (currentNode = treeWalker.nextNode()) {
-                if (currentNode.textContent.trim().length > 0) {
-                    lastTextNode = currentNode;
-                }
-            }
-
-            if (lastTextNode && lastTextNode.parentNode) {
-                 // Insert after the last text node
-                if (lastTextNode.nextSibling) {
-                    lastTextNode.parentNode.insertBefore(badge, lastTextNode.nextSibling);
-                } else {
-                    lastTextNode.parentNode.appendChild(badge);
-                }
-            } else {
-                el.appendChild(badge);
-            }
+            el.appendChild(badge);
         }
     }
 
