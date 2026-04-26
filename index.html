@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibecode Userscript Store</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #1a1a1a;
+            --accent: #3d5afe;
+            --gray: #f5f5f7;
+            --border: #e1e1e1;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #000000;
+                --fg: #f5f5f7;
+                --accent: #536dfe;
+                --gray: #1c1c1e;
+                --border: #333333;
+            }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--fg);
+            line-height: 1.5;
+            padding: 40px 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { margin-bottom: 60px; text-align: center; }
+        h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+        p.subtitle { color: #888; font-size: 1.1rem; }
+
+        .search-container {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            margin-bottom: 40px;
+        }
+        #search {
+            width: 100%;
+            padding: 18px 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: var(--gray);
+            color: var(--fg);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        #search:focus { border-color: var(--accent); box-shadow: 0 4px 25px rgba(61, 90, 254, 0.15); }
+
+        .grid { display: grid; gap: 20px; }
+        .card {
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .card h3 { font-size: 1.3rem; margin-bottom: 8px; color: var(--fg); }
+        .card p { color: #666; font-size: 0.95rem; margin-bottom: 20px; flex-grow: 1; }
+        @media (prefers-color-scheme: dark) { .card p { color: #aaa; } }
+        
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: var(--gray);
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .btn-install {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: opacity 0.2s;
+        }
+        .btn-install:hover { opacity: 0.9; }
+
+        .footer { margin-top: 80px; text-align: center; color: #888; font-size: 0.9rem; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Oh My Vibecode</h1>
+            <p class="subtitle">Kho tàng Userscript tinh hoa, tối ưu trải nghiệm web.</p>
+        </header>
+
+        <div class="search-container">
+            <input type="text" id="search" placeholder="Tìm kiếm script (ví dụ: Zalo, DUT, Facebook...)" autofocus>
+        </div>
+
+        <div class="grid" id="script-grid">
+            <!-- Scripts will be injected here -->
+        </div>
+
+        <div class="footer">
+            &copy; 2025 Developed by <strong>hthienloc</strong> • <a href="https://github.com/hthienloc/oh-my-vibe-userscript" style="color: var(--accent);">GitHub Repo</a>
+        </div>
+    </div>
+
+    <script>
+        const scripts = [
+            {
+                name: "Enhancer for SVDUT",
+                description: "Hiện đại hóa cổng thông tin SV DUT, tích hợp tự động đăng nhập WiFi, quản lý lịch thi và hỗ trợ giải bài tập bằng AI.",
+                tag: "Academic",
+                url: "scripts/academic/enhancer-for-svdut.user.js"
+            },
+            {
+                name: "Facebook Affiliate Filter",
+                description: "Tự động nhận diện và ẩn các bình luận chứa link Shopee/Lazada affiliate hoặc nội dung quảng cáo rác trên Facebook.",
+                tag: "Social",
+                url: "scripts/social/filter-fb-affiliate.user.js"
+            },
+            {
+                name: "SoundCloud Downloader",
+                description: "Tải nhạc chất lượng cao từ SoundCloud kèm theo đầy đủ metadata (Title, Artist, Album Art) trực tiếp trên trình duyệt.",
+                tag: "Media",
+                url: "scripts/media/soundcloud-downloader.user.js"
+            },
+            {
+                name: "Jules Helper",
+                description: "Công cụ cầu nối giữa Jules AI và Gemini, hỗ trợ đồng bộ tin nhắn và phê duyệt các đề xuất code nhanh chóng.",
+                tag: "Productivity",
+                url: "scripts/productivity/jules-helper.user.js"
+            }
+        ];
+
+        const grid = document.getElementById('script-grid');
+        const search = document.getElementById('search');
+
+        function render(filter = '') {
+            grid.innerHTML = '';
+            const filtered = scripts.filter(s => 
+                s.name.toLowerCase().includes(filter.toLowerCase()) || 
+                s.description.toLowerCase().includes(filter.toLowerCase()) ||
+                s.tag.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            filtered.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div>
+                        <span class="tag">${s.tag}</span>
+                        <h3>${s.name}</h3>
+                        <p>${s.description}</p>
+                    </div>
+                    <a href="${s.url}" class="btn-install">Cài đặt ngay</a>
+                `;
+                grid.appendChild(card);
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="text-align:center; padding: 40px; color:#888;">Không tìm thấy script nào phù hợp.</p>';
+            }
+        }
+
+        search.addEventListener('input', (e) => render(e.target.value));
+        render();
+    </script>
+</body>
+</html>
