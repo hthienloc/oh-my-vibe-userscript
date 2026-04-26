@@ -166,13 +166,54 @@
     }
 
     /**
-     * Injects both SYNC and MANUAL REFRESH buttons.
+     * Injects QUICK REPLIES, SYNC, and MANUAL REFRESH buttons.
      */
     function injectActionButtons(container, textGetter) {
         if (container.getAttribute('data-gemini-injected') === 'true') return;
         
+        const wrapper = document.createElement('div');
+        Object.assign(wrapper.style, { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' });
+
+        // --- ROW 1: QUICK REPLIES ---
+        const quickRow = document.createElement('div');
+        Object.assign(quickRow.style, { display: 'flex', gap: '6px', flexWrap: 'wrap' });
+
+        const quickPrompts = [
+            { label: '➡️ Continue', text: 'Can you continue?' },
+            { label: '🧐 Explain', text: 'Can you explain this logic?' },
+            { label: '🛠️ Fix', text: 'I found an issue here, please fix it.' },
+            { label: '✅ Done', text: 'Everything looks good, thank you!' }
+        ];
+
+        quickPrompts.forEach(p => {
+            const qBtn = document.createElement('button');
+            qBtn.textContent = p.label;
+            Object.assign(qBtn.style, {
+                padding: '4px 8px', background: '#f8f9fa', color: '#5f6368', border: '1px solid #dadce0', 
+                borderRadius: '6px', fontSize: '10px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+            });
+            qBtn.onmouseover = () => qBtn.style.background = '#e8f0fe';
+            qBtn.onmouseout = () => qBtn.style.background = '#f8f9fa';
+            qBtn.onclick = () => {
+                const input = getChatInput();
+                if (input) {
+                    input.value = p.text;
+                    input.textContent = p.text;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(() => {
+                        const sendBtn = document.querySelector('button[type="submit"]') || 
+                                         document.querySelector('button[aria-label*="Send"]');
+                        if (sendBtn) sendBtn.click();
+                    }, 50);
+                }
+            };
+            quickRow.appendChild(qBtn);
+        });
+        wrapper.appendChild(quickRow);
+
+        // --- ROW 2: CORE ACTIONS ---
         const btnGroup = document.createElement('div');
-        Object.assign(btnGroup.style, { display: 'flex', gap: '8px', marginTop: '8px' });
+        Object.assign(btnGroup.style, { display: 'flex', gap: '8px' });
 
         // 1. SYNC TO GEMINI
         const syncBtn = document.createElement('button');
@@ -210,7 +251,9 @@
 
         btnGroup.appendChild(syncBtn);
         btnGroup.appendChild(refreshBtn);
-        container.appendChild(btnGroup);
+        wrapper.appendChild(btnGroup);
+
+        container.appendChild(wrapper);
         container.setAttribute('data-gemini-injected', 'true');
     }
 
