@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.2
+// @version      1.0.3
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -102,17 +102,25 @@
     function processElement(el) {
         if (el.dataset.chessEvaluated) return;
         
-        // Only process leaf-like elements to avoid double badges
-        if (el.children.length > 0 && el.querySelector('div, span')) return;
-
         const text = (el.innerText || '').trim();
         if (text.length < 2) return;
+
+        // Skip containers that have child elements with text (we only want the leaf nodes)
+        if (el.children.length > 0 && Array.from(el.children).some(c => ['DIV', 'SPAN', 'P'].includes(c.tagName))) {
+            return;
+        }
 
         const cls = getClassification(text);
         if (cls) {
             el.dataset.chessEvaluated = 'true';
             const badge = createBadge(cls);
-            el.appendChild(badge);
+            
+            // Positioning logic
+            if (el.tagName === 'DIV') {
+                el.appendChild(badge);
+            } else {
+                el.parentNode.insertBefore(badge, el.nextSibling);
+            }
         }
     }
 
