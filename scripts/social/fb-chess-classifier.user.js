@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.13
+// @version      1.0.15
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -19,15 +19,15 @@
 
     const CLASSIFICATIONS = {
         BRILLIANT: { id: 'brilliant', label: '!!', color: '#1baca6', title: 'Brilliant', priority: 1, keywords: ['tối ưu', 'kiến trúc', 'đỉnh cao', 'hoàn hảo', 'thiên tài', 'xuất sắc', 'đột phá', 'refactor'] },
-        GREAT: { id: 'great', label: '!', color: '#5c8bb0', title: 'Great Move', priority: 2, keywords: ['tuyệt vời', 'hay quá', 'giỏi', 'ấn tượng'] },
-        EXCELLENT: { id: 'excellent', label: '!!', color: '#96bc4b', title: 'Excellent', priority: 2.5, keywords: ['hay', 'tốt', 'hợp lý', 'chính xác'] },
+        GREAT: { id: 'great', label: '!', color: '#5c8bb0', title: 'Great Move', priority: 2, keywords: ['tuyệt vời', 'hay quá', 'giỏi', 'ấn tượng', 'cháy', 'khét', 'uy tín', 'cook', 'flex', 'slay', 'mãi đỉnh', 'out trình'] },
+        EXCELLENT: { id: 'excellent', label: '!!', color: '#96bc4b', title: 'Excellent', priority: 2.5, keywords: ['hay', 'tốt', 'hợp lý', 'chính xác', 'cháy', 'khét', 'uy tín', 'cook', 'flex', 'slay', 'mãi đỉnh', 'out trình'] },
         BEST: { id: 'best', label: '★', color: '#81b64c', title: 'Best Move', priority: 3, keywords: ['chuẩn', 'đúng rồi', 'nhất trí'] },
         GOOD: { id: 'good', label: '✓', color: '#95bb4a', title: 'Good Move', priority: 4, keywords: ['được', 'ổn', 'ok', 'tạm'] },
         BOOK: { id: 'book', label: '📚', color: '#a88865', title: 'Book Move', priority: 5, keywords: ['chào', 'hello', 'hi', 'bye', 'tạm biệt', 'hẹn gặp'] },
-        INACCURACY: { id: 'inaccuracy', label: '?!', color: '#f3a632', title: 'Inaccuracy', priority: 6, keywords: ['ủa', 'hả', 'saooo', 'jztr', 'lạ vậy', 'ảo'] },
+        INACCURACY: { id: 'inaccuracy', label: '?!', color: '#f3a632', title: 'Inaccuracy', priority: 6, keywords: ['ủa', 'hả', 'saooo', 'jztr', 'lạ vậy', 'ảo', 'k', 'ko', 'dc', 'đc', 'v', 'm', 't', 'ae', 'r', 'j', 'ảo ma', 'lú'] },
         MISTAKE: { id: 'mistake', label: '?', color: '#e58f2a', title: 'Mistake', priority: 7, keywords: ['sai', 'nhầm', 'lỗi', 'bug', 'hỏng', 'quên'] },
         MISS: { id: 'miss', label: 'X', color: '#ff7769', title: 'Missed Win', priority: 8, keywords: ['tiếc', 'bó tay', 'bỏ lỡ', 'đành chịu'] },
-        BLUNDER: { id: 'blunder', label: '??', color: '#fa412d', title: 'Blunder', priority: 9, keywords: ['ngu', 'đần', 'chó', 'vcl', 'dkm', 'đkm', 'địt', 'đụ', 'cặc', 'lồn', 'câm', 'sủa'] }
+        BLUNDER: { id: 'blunder', label: '??', color: '#fa412d', title: 'Blunder', priority: 9, keywords: ['ngu', 'đần', 'chó', 'vcl', 'dkm', 'đkm', 'địt', 'đụ', 'cặc', 'lồn', 'câm', 'sủa', 'đm', 'cl', 'vkl', 'ml', 'đcm'] }
     };
 
     const ASSET_BASE_URL = 'https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/chess-icons/';
@@ -57,6 +57,9 @@
         // Excessive punctuation
         if (/([!?])\1{2,}/.test(text)) score -= 10;
         
+        // Repeated characters
+        if (/(.)\1{4,}/i.test(text)) score -= 10;
+
         // Negative keywords
         if (CLASSIFICATIONS.MISTAKE.keywords.some(k => lowerText.includes(k))) score -= 20;
         if (CLASSIFICATIONS.MISS.keywords.some(k => lowerText.includes(k))) score -= 15;
@@ -68,6 +71,9 @@
         
         // Sentence length
         if (text.length > 20) score += 5;
+
+        // Proper capitalization and ending punctuation
+        if (/^[A-Z]/.test(text) && /[.!?]$/.test(text.trim())) score += 10;
         
         // Professional and positive keywords
         if (CLASSIFICATIONS.BRILLIANT.keywords.some(k => lowerText.includes(k))) score += 30;
@@ -84,16 +90,23 @@
         if (score === 0) return null;
 
         // --- Thresholds ---
-        if (score <= -40) return CLASSIFICATIONS.BLUNDER;
-        if (score <= -20) return CLASSIFICATIONS.MISTAKE;
-        if (score <= -15) return CLASSIFICATIONS.MISS;
-        if (score < 0) return CLASSIFICATIONS.INACCURACY;
-        
-        if (score >= 35) return CLASSIFICATIONS.BRILLIANT;
-        if (score >= 25) return CLASSIFICATIONS.EXCELLENT;
-        if (score >= 15) return CLASSIFICATIONS.GREAT;
-        if (score >= 10) return CLASSIFICATIONS.BEST;
-        return CLASSIFICATIONS.GOOD;
+        let result;
+        if (score <= -40) result = CLASSIFICATIONS.BLUNDER;
+        else if (score <= -20) result = CLASSIFICATIONS.MISTAKE;
+        else if (score <= -15) result = CLASSIFICATIONS.MISS;
+        else if (score < 0) result = CLASSIFICATIONS.INACCURACY;
+        else if (score >= 35) result = CLASSIFICATIONS.BRILLIANT;
+        else if (score >= 25) result = CLASSIFICATIONS.EXCELLENT;
+        else if (score >= 15) result = CLASSIFICATIONS.GREAT;
+        else if (score >= 10) result = CLASSIFICATIONS.BEST;
+        else result = CLASSIFICATIONS.GOOD;
+
+        // "Brilliant Luck" Mechanism
+        if ((result === CLASSIFICATIONS.GREAT || result === CLASSIFICATIONS.BEST) && Math.random() < 0.03) {
+            return CLASSIFICATIONS.BRILLIANT;
+        }
+
+        return result;
     }
 
     function applyFallbackBadge(badge, img, cls) {
@@ -212,19 +225,36 @@
         const text = (el.innerText || el.textContent || '').trim();
         if (text.length < 2 || text.length >= 500) return;
 
+        // Link Exclusion
+        if (/(https?:\/\/[^\s]+|www\.[^\s]+)/i.test(text)) {
+            return;
+        }
+
         const cls = getClassification(text);
         if (cls) {
             el.dataset.chessEvaluated = 'true';
             const badge = createBadge(cls);
             
-            // Adjust parent to prevent layout breaking
-            if (getComputedStyle(el).display === 'block') {
-                el.style.display = 'flex';
-                el.style.alignItems = 'center';
-                el.style.flexWrap = 'wrap';
+            // Try to append right after the last text node to prevent line breaks
+            let lastTextNode = null;
+            const treeWalker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+            let currentNode;
+            while (currentNode = treeWalker.nextNode()) {
+                if (currentNode.textContent.trim().length > 0) {
+                    lastTextNode = currentNode;
+                }
             }
-            
-            el.appendChild(badge);
+
+            if (lastTextNode && lastTextNode.parentNode) {
+                 // Insert after the last text node
+                if (lastTextNode.nextSibling) {
+                    lastTextNode.parentNode.insertBefore(badge, lastTextNode.nextSibling);
+                } else {
+                    lastTextNode.parentNode.appendChild(badge);
+                }
+            } else {
+                el.appendChild(badge);
+            }
         }
     }
 
