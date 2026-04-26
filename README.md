@@ -13,10 +13,8 @@
 
 ### 🏠 Academic / University (sv.dut.udn.vn)
 
-- **Enhancer for SVDUT**: Tiện ích hiện đại hóa cổng thông tin sinh viên Bach Khoa Da Nang.
+- **Enhancer for SVDUT**: Tiện ích hiện đại hóa cổng thông tin sinh viên Bach Khoa Da Nang. Tích hợp sẵn tính năng tự động đăng nhập WiFi DUT.
   - [Cài đặt ngay](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/academic/enhancer-for-svdut.user.js)
-- **DUT WiFi Auto-Login**: Tự động đăng nhập hệ thống WiFi E4T.
-  - [Cài đặt ngay](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/academic/dut-auto-login.user.js)
 
 ### 📱 Social Media (Facebook)
 
@@ -29,6 +27,11 @@
 
 - **SoundCloud Downloader**: Tải nhạc trực tiếp từ trang SoundCloud với đầy đủ metadata.
   - [Cài đặt ngay](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/media/soundcloud-downloader.user.js)
+
+### 🛠️ Productivity / Development
+
+- **Jules Helper**: Bridge hai chiều giữa Jules và Gemini, giúp đồng bộ tin nhắn và đề xuất phản hồi nhanh chóng.
+  - [Cài đặt ngay](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js)
 
 ## 🚀 Cài đặt chung
 

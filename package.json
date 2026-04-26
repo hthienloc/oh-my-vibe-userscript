@@ -1,0 +1,15 @@
+{
+  "name": "oh-my-vibe-userscript",
+  "version": "1.0.0",
+  "description": "Monorepo for all Vibecode Userscripts",
+  "type": "module",
+  "scripts": {
+    "build:svdut": "cd src/academic/enhancer-for-svdut && bun build.ts",
+    "build:others": "bun build-others.ts",
+    "build": "npm run build:svdut && npm run build:others",
+    "install:all": "cd src/academic/enhancer-for-svdut && bun install"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.12"
+  }
+}
