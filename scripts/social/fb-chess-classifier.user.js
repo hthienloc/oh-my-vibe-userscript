@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.5
+// @version      1.0.6
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -69,8 +69,8 @@
         const img = document.createElement('img');
         img.src = `${ASSET_BASE_URL}${cls.id}.png`;
         Object.assign(img.style, {
-            width: '20px',
-            height: '20px',
+            width: '24px',
+            height: '24px',
             display: 'block'
         });
 
@@ -100,10 +100,27 @@
     function processElement(el) {
         if (el.dataset.chessEvaluated) return;
         
-        // Deepest child check: We only want elements that actually contain the text
-        // Messenger structure from dom.txt: span[dir="auto"] > div[dir="auto"]
-        if (el.children.length > 0 && Array.from(el.children).some(c => c.tagName === 'DIV' || c.tagName === 'SPAN')) {
+        // Smart Meta-data Exclusion
+        if (el.closest('[role="button"]') || el.closest('button')) {
             return;
+        }
+
+        const linkParent = el.closest('a') || el.closest('[role="link"]');
+        if (linkParent) {
+            const linkText = (linkParent.innerText || '').trim();
+            if (linkText.length < 50) {
+                return;
+            }
+        }
+
+        // Improved Leaf Node Detection: Focus on innermost div[dir="auto"] or span with significant text
+        if (el.children.length > 0) {
+            const hasSignificantChild = Array.from(el.querySelectorAll('div[dir="auto"], span')).some(c => {
+                return c !== el && (c.innerText || '').trim().length >= 2;
+            });
+            if (hasSignificantChild) {
+                return;
+            }
         }
 
         const text = (el.innerText || '').trim();
