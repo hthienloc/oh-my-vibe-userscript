@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.12
+// @version      1.0.13
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -36,27 +36,64 @@
     const imageCache = {};
 
     function getClassification(text) {
+        let score = 0;
         const lowerText = text.toLowerCase();
         
-        const order = [
-            CLASSIFICATIONS.BLUNDER,
-            CLASSIFICATIONS.BRILLIANT,
-            CLASSIFICATIONS.MISS,
-            CLASSIFICATIONS.MISTAKE,
-            CLASSIFICATIONS.INACCURACY,
-            CLASSIFICATIONS.GREAT,
-            CLASSIFICATIONS.EXCELLENT,
-            CLASSIFICATIONS.BEST,
-            CLASSIFICATIONS.BOOK,
-            CLASSIFICATIONS.GOOD
-        ];
-
-        for (const cls of order) {
-            if (cls.keywords.some(k => lowerText.includes(k))) {
-                return cls;
-            }
+        // --- Penalties ---
+        // Profanity
+        if (CLASSIFICATIONS.BLUNDER.keywords.some(k => lowerText.includes(k))) score -= 50;
+        
+        // Excessive emojis (>3 in a row)
+        const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}){4,}/gu;
+        if (emojiRegex.test(text)) score -= 15;
+        
+        // ALL CAPS shouting
+        const letters = text.replace(/[^a-zA-Z]/g, '');
+        if (letters.length > 5) {
+            const upperCount = (letters.match(/[A-Z]/g) || []).length;
+            if (upperCount / letters.length > 0.5) score -= 15;
         }
-        return null;
+        
+        // Excessive punctuation
+        if (/([!?])\1{2,}/.test(text)) score -= 10;
+        
+        // Negative keywords
+        if (CLASSIFICATIONS.MISTAKE.keywords.some(k => lowerText.includes(k))) score -= 20;
+        if (CLASSIFICATIONS.MISS.keywords.some(k => lowerText.includes(k))) score -= 15;
+        if (CLASSIFICATIONS.INACCURACY.keywords.some(k => lowerText.includes(k))) score -= 10;
+
+        // --- Rewards ---
+        // Proper punctuation
+        if (/[.,]/.test(text)) score += 5;
+        
+        // Sentence length
+        if (text.length > 20) score += 5;
+        
+        // Professional and positive keywords
+        if (CLASSIFICATIONS.BRILLIANT.keywords.some(k => lowerText.includes(k))) score += 30;
+        else if (CLASSIFICATIONS.GREAT.keywords.some(k => lowerText.includes(k))) score += 20;
+        else if (CLASSIFICATIONS.EXCELLENT.keywords.some(k => lowerText.includes(k))) score += 15;
+        else if (CLASSIFICATIONS.BEST.keywords.some(k => lowerText.includes(k))) score += 10;
+        else if (CLASSIFICATIONS.GOOD.keywords.some(k => lowerText.includes(k))) score += 5;
+
+        // Book move fallback
+        if (score === 0 && CLASSIFICATIONS.BOOK.keywords.some(k => lowerText.includes(k))) {
+            return CLASSIFICATIONS.BOOK;
+        }
+
+        if (score === 0) return null;
+
+        // --- Thresholds ---
+        if (score <= -40) return CLASSIFICATIONS.BLUNDER;
+        if (score <= -20) return CLASSIFICATIONS.MISTAKE;
+        if (score <= -15) return CLASSIFICATIONS.MISS;
+        if (score < 0) return CLASSIFICATIONS.INACCURACY;
+        
+        if (score >= 35) return CLASSIFICATIONS.BRILLIANT;
+        if (score >= 25) return CLASSIFICATIONS.EXCELLENT;
+        if (score >= 15) return CLASSIFICATIONS.GREAT;
+        if (score >= 10) return CLASSIFICATIONS.BEST;
+        return CLASSIFICATIONS.GOOD;
     }
 
     function applyFallbackBadge(badge, img, cls) {
@@ -135,10 +172,6 @@
         return badge;
     }
 
-    function hasSignificantChild(el) {
-        return el.children.length > 0 && Array.from(el.children).some(c => c.tagName === 'DIV' || c.tagName === 'SPAN');
-    }
-
     function processElement(el) {
         if (el.dataset.chessEvaluated) return;
         
@@ -166,12 +199,17 @@
             return;
         }
         
-        // Deepest child check: We only want elements that actually contain the text
-        if (hasSignificantChild(el)) {
-            return;
+        // Ensure we are targeting the actual text container to prevent nested evaluation
+        // Check if there's a text node that actually contains text
+        const hasDirectText = Array.from(el.childNodes).some(node => 
+            node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
+        );
+        
+        if (!hasDirectText && el.children.length > 0) {
+            return; // Skip parent containers that don't directly hold text
         }
 
-        const text = (el.innerText || '').trim();
+        const text = (el.innerText || el.textContent || '').trim();
         if (text.length < 2 || text.length >= 500) return;
 
         const cls = getClassification(text);
@@ -192,10 +230,11 @@
 
     function scan() {
         const selectors = [
-            'div[dir="auto"]',
+            'div[dir="auto"]:not([role="textbox"])',
             'span[dir="auto"]',
             'div[role="article"] div[dir="ltr"]',
-            'span.x1lliihq'
+            'span.x1lliihq',
+            '.x1iorvi4'
         ];
         document.querySelectorAll(selectors.join(',')).forEach(processElement);
     }
@@ -203,12 +242,12 @@
     let timer = null;
     const observer = new MutationObserver((mutations) => {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(scan, 500); 
+        timer = setTimeout(scan, 100); 
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
     
     // Initial delay to let FB dynamic UI settle
     setTimeout(scan, 2000);
-    console.log('%c[Chess Move Classifier V1.0.11] Pro Edition Loaded!', 'color: #81b64c; font-weight: bold;');
+    console.log('%c[Chess Move Classifier V1.0.12] Pro Edition Loaded!', 'color: #81b64c; font-weight: bold;');
 })();
