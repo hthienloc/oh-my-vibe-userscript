@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
-// @namespace    https://github.com/hthienloc/enhancer-for-svdut
+// @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
 // @version      1.4.3
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc

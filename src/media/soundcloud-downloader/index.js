@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         SoundCloud Downloader
-// @namespace    https://github.com/hthienloc
+// @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
 // @version      1.3.4
 // @description  Download SoundCloud tracks with embedded ID3 metadata (title, artist, album, cover art) locally.
 // @author       hthienloc (based on maple3142)

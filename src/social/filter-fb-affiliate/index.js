@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Facebook Affiliate Comment Filter
-// @namespace    http://tampermonkey.net/
+// @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
 // @version      1.0
 // @description  Automatically hide comments containing affiliate links or promotional keywords on Facebook.
 // @author       hthienloc
