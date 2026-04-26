@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.15
+// @version      1.0.16
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -22,9 +22,9 @@
         GREAT: { id: 'great', label: '!', color: '#5c8bb0', title: 'Great Move', priority: 2, keywords: ['tuyệt vời', 'hay quá', 'giỏi', 'ấn tượng', 'cháy', 'khét', 'uy tín', 'cook', 'flex', 'slay', 'mãi đỉnh', 'out trình'] },
         EXCELLENT: { id: 'excellent', label: '!!', color: '#96bc4b', title: 'Excellent', priority: 2.5, keywords: ['hay', 'tốt', 'hợp lý', 'chính xác', 'cháy', 'khét', 'uy tín', 'cook', 'flex', 'slay', 'mãi đỉnh', 'out trình'] },
         BEST: { id: 'best', label: '★', color: '#81b64c', title: 'Best Move', priority: 3, keywords: ['chuẩn', 'đúng rồi', 'nhất trí'] },
-        GOOD: { id: 'good', label: '✓', color: '#95bb4a', title: 'Good Move', priority: 4, keywords: ['được', 'ổn', 'ok', 'tạm'] },
+        GOOD: { id: 'good', label: '✓', color: '#95bb4a', title: 'Good Move', priority: 4, keywords: ['được', 'ổn', 'ok', 'tạm', 'ủa', 'ảo ma', 'lú', 'jztr'] },
         BOOK: { id: 'book', label: '📚', color: '#a88865', title: 'Book Move', priority: 5, keywords: ['chào', 'hello', 'hi', 'bye', 'tạm biệt', 'hẹn gặp'] },
-        INACCURACY: { id: 'inaccuracy', label: '?!', color: '#f3a632', title: 'Inaccuracy', priority: 6, keywords: ['ủa', 'hả', 'saooo', 'jztr', 'lạ vậy', 'ảo', 'k', 'ko', 'dc', 'đc', 'v', 'm', 't', 'ae', 'r', 'j', 'ảo ma', 'lú'] },
+        INACCURACY: { id: 'inaccuracy', label: '?!', color: '#f3a632', title: 'Inaccuracy', priority: 6, keywords: ['hả', 'saooo', 'lạ vậy', 'ảo'] },
         MISTAKE: { id: 'mistake', label: '?', color: '#e58f2a', title: 'Mistake', priority: 7, keywords: ['sai', 'nhầm', 'lỗi', 'bug', 'hỏng', 'quên'] },
         MISS: { id: 'miss', label: 'X', color: '#ff7769', title: 'Missed Win', priority: 8, keywords: ['tiếc', 'bó tay', 'bỏ lỡ', 'đành chịu'] },
         BLUNDER: { id: 'blunder', label: '??', color: '#fa412d', title: 'Blunder', priority: 9, keywords: ['ngu', 'đần', 'chó', 'vcl', 'dkm', 'đkm', 'địt', 'đụ', 'cặc', 'lồn', 'câm', 'sủa', 'đm', 'cl', 'vkl', 'ml', 'đcm'] }
@@ -64,6 +64,9 @@
         if (CLASSIFICATIONS.MISTAKE.keywords.some(k => lowerText.includes(k))) score -= 20;
         if (CLASSIFICATIONS.MISS.keywords.some(k => lowerText.includes(k))) score -= 15;
         if (CLASSIFICATIONS.INACCURACY.keywords.some(k => lowerText.includes(k))) score -= 10;
+        
+        const teencodeKeywords = ['k', 'ko', 'dc', 'đc', 'v', 'm', 't', 'ae', 'r', 'j'];
+        if (teencodeKeywords.some(k => lowerText.includes(k))) score -= 2;
 
         // --- Rewards ---
         // Proper punctuation
@@ -87,23 +90,29 @@
             return CLASSIFICATIONS.BOOK;
         }
 
-        if (score === 0) return null;
+        // Apply chaos factor
+        score += (Math.random() * 10 - 5);
 
         // --- Thresholds ---
         let result;
         if (score <= -40) result = CLASSIFICATIONS.BLUNDER;
         else if (score <= -20) result = CLASSIFICATIONS.MISTAKE;
         else if (score <= -15) result = CLASSIFICATIONS.MISS;
-        else if (score < 0) result = CLASSIFICATIONS.INACCURACY;
+        else if (score < -5) result = CLASSIFICATIONS.INACCURACY;
         else if (score >= 35) result = CLASSIFICATIONS.BRILLIANT;
         else if (score >= 25) result = CLASSIFICATIONS.EXCELLENT;
-        else if (score >= 15) result = CLASSIFICATIONS.GREAT;
-        else if (score >= 10) result = CLASSIFICATIONS.BEST;
+        else if (score >= 15) result = CLASSIFICATIONS.BEST;
         else result = CLASSIFICATIONS.GOOD;
 
-        // "Brilliant Luck" Mechanism
-        if ((result === CLASSIFICATIONS.GREAT || result === CLASSIFICATIONS.BEST) && Math.random() < 0.03) {
+        // Luck Promotion
+        if (score > 0 && Math.random() < 0.05) {
             return CLASSIFICATIONS.BRILLIANT;
+        }
+
+        const isShort = text.length < 20;
+        const isTrendy = CLASSIFICATIONS.GREAT.keywords.some(k => lowerText.includes(k));
+        if (isShort && isTrendy && Math.random() < 0.10) {
+            return CLASSIFICATIONS.GREAT;
         }
 
         return result;
@@ -226,7 +235,9 @@
         if (text.length < 2 || text.length >= 500) return;
 
         // Link Exclusion
-        if (/(https?:\/\/[^\s]+|www\.[^\s]+)/i.test(text)) {
+        // Refined to avoid matching trailing dots (like hello...)
+        const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+\.[^\s]{2,})/i;
+        if (urlRegex.test(text)) {
             return;
         }
 
