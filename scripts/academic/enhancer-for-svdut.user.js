@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.4.31
+// @version      1.4.32
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc
 // @match        https://sv.dut.udn.vn/*
 // @match        http://lms.dut.udn.vn/*
 // @match        https://lms.dut.udn.vn/*
 // @match        https://wifi.dut.udn.vn/*
+// @match        https://*.dut.navia.io.vn/*
 // @match        https://gemini.google.com/app*
 // @grant        GM_setClipboard
 // @license      MIT
@@ -1303,7 +1304,7 @@ async function showAllQuestionsOnSummary() {
 
 // src/wifi.js
 function handleWifiPages(url) {
-  if (url.includes("wifi.dut.udn.vn")) {
+  if (url.includes("wifi.dut.udn.vn") || url.includes("dut.navia.io.vn")) {
     const loginBtn = document.querySelector('a.hero__left__button[href="/login"]');
     if (loginBtn) {
       console.log("[DUT Portal] Auto-clicking MS login...");

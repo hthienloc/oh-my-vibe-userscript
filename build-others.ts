@@ -42,9 +42,11 @@ for (const script of scriptsToSync) {
       if (versionMatch) {
         const oldVersion = versionMatch[1];
         const newVersion = bumpVersion(oldVersion);
-        finalContent = srcContent.replace(`@version      ${oldVersion}`, `@version      ${newVersion}`);
-        finalContent = finalContent.replace(`@version      ${oldVersion}`, `@version      ${newVersion}`); // fallback for different spacing
-        finalContent = finalContent.replace(new RegExp(`@version\\s+${oldVersion.replace(/\./g, '\\.')}`), `// @version      ${newVersion}`);
+        // Replace ONLY the version number part of the specific @version line
+        finalContent = srcContent.replace(
+          /(\/\/ @version\s+)[\d.]+/,
+          `$1${newVersion}`
+        );
         
         // Update the source file with new version
         writeFileSync(script.src, finalContent);

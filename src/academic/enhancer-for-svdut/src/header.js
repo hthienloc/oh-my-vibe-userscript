@@ -8,6 +8,7 @@
 // @match        http://lms.dut.udn.vn/*
 // @match        https://lms.dut.udn.vn/*
 // @match        https://wifi.dut.udn.vn/*
+// @match        https://*.dut.navia.io.vn/*
 // @match        https://gemini.google.com/app*
 // @grant        GM_setClipboard
 // @license      MIT
