@@ -7,6 +7,7 @@
     "build:svdut": "cd src/academic/enhancer-for-svdut && bun build.ts",
     "build:others": "bun build-others.ts",
     "build": "npm run build:svdut && npm run build:others",
+    "jules-bridge": "python3 src/productivity/jules-helper/server/relay_server.py",
     "install:all": "cd src/academic/enhancer-for-svdut && bun install"
   },
   "devDependencies": {

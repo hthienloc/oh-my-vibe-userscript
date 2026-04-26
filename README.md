@@ -27,7 +27,8 @@
 ### 🛠️ Productivity / Development
 
 - **Jules Helper**: Bridge hai chiều giữa Jules và Gemini, giúp đồng bộ tin nhắn và đề xuất phản hồi nhanh chóng.
-  - [Cài đặt ngay](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js)
+  - [Cài đặt userscript](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js)
+  - **Lưu ý**: Cần chạy relay server bằng lệnh `npm run jules-bridge` để sử dụng tính năng đồng bộ.
 
 ## 🚀 Cài đặt chung
 
