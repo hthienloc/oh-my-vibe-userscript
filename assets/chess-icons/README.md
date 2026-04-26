@@ -6,6 +6,7 @@ Please upload the official evaluation icons here. The userscript is configured t
 | :--- | :--- |
 | Brilliant | `brilliant.png` |
 | Great Move | `great.png` |
+| Excellent | `excellent.png` |
 | Best Move | `best.png` |
 | Good Move | `good.png` |
 | Book Move | `book.png` |

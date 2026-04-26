@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.1
+// @version      1.0.2
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -38,6 +38,7 @@
             CLASSIFICATIONS.MISTAKE,
             CLASSIFICATIONS.INACCURACY,
             CLASSIFICATIONS.GREAT,
+            CLASSIFICATIONS.EXCELLENT,
             CLASSIFICATIONS.BEST,
             CLASSIFICATIONS.BOOK,
             CLASSIFICATIONS.GOOD
