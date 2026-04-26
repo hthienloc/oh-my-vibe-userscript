@@ -19,6 +19,7 @@
     const AFFILIATE_PATTERNS = [
         /shope\.ee/i,
         /shopee\.vn/i,
+        /shp\.ee/i,
         /shorten\.asia/i,
         /atv\.sh/i,
         /s\.lazada\.vn/i,
