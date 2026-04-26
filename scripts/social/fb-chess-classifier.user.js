@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.7
+// @version      1.0.12
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
 // @match        https://www.messenger.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      github.com
+// @connect      raw.githubusercontent.com
 // @run-at       document-idle
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/social/fb-chess-classifier.user.js
 // @downloadURL  https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/social/fb-chess-classifier.user.js
@@ -29,6 +31,9 @@
     };
 
     const ASSET_BASE_URL = 'https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/chess-icons/';
+    
+    // Global cache for base64 icons to prevent redundant network requests
+    const imageCache = {};
 
     function getClassification(text) {
         const lowerText = text.toLowerCase();
@@ -54,6 +59,25 @@
         return null;
     }
 
+    function applyFallbackBadge(badge, img, cls) {
+        img.style.display = 'none';
+        badge.textContent = cls.label;
+        Object.assign(badge.style, {
+            width: '18px',
+            height: '18px',
+            backgroundColor: cls.color,
+            color: 'white',
+            borderRadius: '50%',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            justifyContent: 'center',
+            alignItems: 'center',
+            display: 'inline-flex',
+            fontFamily: 'sans-serif',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+        });
+    }
+
     function createBadge(cls) {
         const badge = document.createElement('span');
         badge.className = 'chess-badge-container';
@@ -63,48 +87,72 @@
             verticalAlign: 'middle',
             marginLeft: '6px',
             userSelect: 'none',
-            flexShrink: '0'
+            flexShrink: '0',
+            alignItems: 'center',
+            justifyContent: 'center'
         });
         
         const img = document.createElement('img');
-        img.src = `${ASSET_BASE_URL}${cls.id}.png`;
         Object.assign(img.style, {
             width: '20px',
             height: '20px',
             display: 'block'
         });
 
-        // Fallback
-        img.onerror = () => {
-            img.style.display = 'none';
-            badge.textContent = cls.label;
-            Object.assign(badge.style, {
-                width: '18px',
-                height: '18px',
-                backgroundColor: cls.color,
-                color: 'white',
-                borderRadius: '50%',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                justifyContent: 'center',
-                alignItems: 'center',
-                fontFamily: 'sans-serif',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+        // Use cached Base64 if available
+        if (imageCache[cls.id]) {
+            img.src = imageCache[cls.id];
+            badge.appendChild(img);
+        } else if (typeof GM_xmlhttpRequest !== 'undefined') {
+            // Fetch via GM_xmlhttpRequest to bypass CSP
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `${ASSET_BASE_URL}${cls.id}.png`,
+                responseType: 'blob',
+                onload: function(response) {
+                    if (response.status === 200) {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            const base64data = reader.result;
+                            imageCache[cls.id] = base64data; // Cache it
+                            img.src = base64data;
+                            if (!badge.contains(img)) badge.appendChild(img);
+                        }
+                        reader.readAsDataURL(response.response);
+                    } else {
+                        applyFallbackBadge(badge, img, cls);
+                    }
+                },
+                onerror: function() {
+                    applyFallbackBadge(badge, img, cls);
+                }
             });
-        };
+        } else {
+            applyFallbackBadge(badge, img, cls);
+        }
 
-        badge.appendChild(img);
+        img.onerror = () => applyFallbackBadge(badge, img, cls);
         return badge;
+    }
+
+    function hasSignificantChild(el) {
+        return el.children.length > 0 && Array.from(el.children).some(c => c.tagName === 'DIV' || c.tagName === 'SPAN');
     }
 
     function processElement(el) {
         if (el.dataset.chessEvaluated) return;
         
-        // Smart Meta-data Exclusion
+        // Exclude input fields and contenteditable elements
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
+            return;
+        }
+
+        // Exclude elements with role="button" or buttons
         if (el.closest('[role="button"]') || el.closest('button')) {
             return;
         }
 
+        // Exclude names and profile links (usually short strings inside <a>)
         const linkParent = el.closest('a') || el.closest('[role="link"]');
         if (linkParent) {
             const linkText = (linkParent.innerText || '').trim();
@@ -113,18 +161,18 @@
             }
         }
 
-        // Improved Leaf Node Detection: Focus on innermost div[dir="auto"] or span with significant text
-        if (el.children.length > 0) {
-            const hasSignificantChild = Array.from(el.querySelectorAll('div[dir="auto"], span')).some(c => {
-                return c !== el && (c.innerText || '').trim().length >= 2;
-            });
-            if (hasSignificantChild) {
-                return;
-            }
+        // Exclude elements that are inside a contenteditable container
+        if (el.closest('[contenteditable="true"]')) {
+            return;
+        }
+        
+        // Deepest child check: We only want elements that actually contain the text
+        if (hasSignificantChild(el)) {
+            return;
         }
 
         const text = (el.innerText || '').trim();
-        if (text.length < 2) return;
+        if (text.length < 2 || text.length >= 500) return;
 
         const cls = getClassification(text);
         if (cls) {
@@ -143,7 +191,6 @@
     }
 
     function scan() {
-        // Broad but filtered by processElement's leaf-node logic
         const selectors = [
             'div[dir="auto"]',
             'span[dir="auto"]',
@@ -156,12 +203,12 @@
     let timer = null;
     const observer = new MutationObserver((mutations) => {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(scan, 300);
+        timer = setTimeout(scan, 500); 
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
     
     // Initial delay to let FB dynamic UI settle
     setTimeout(scan, 2000);
-    console.log('%c[Chess Move Classifier V1.0.4] Running with Official Assets!', 'color: #81b64c; font-weight: bold;');
+    console.log('%c[Chess Move Classifier V1.0.11] Pro Edition Loaded!', 'color: #81b64c; font-weight: bold;');
 })();
