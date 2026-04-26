@@ -4,7 +4,8 @@ import { join } from "node:path";
 const scriptsToSync = [
   { name: "Facebook Affiliate Filter", src: "src/social/filter-fb-affiliate/index.js", dist: "scripts/social/filter-fb-affiliate.user.js" },
   { name: "SoundCloud Downloader", src: "src/media/soundcloud-downloader/index.js", dist: "scripts/media/soundcloud-downloader.user.js" },
-  { name: "Jules Helper", src: "src/productivity/jules-helper/index.js", dist: "scripts/productivity/jules-helper.user.js" }
+  { name: "Jules Helper", src: "src/productivity/jules-helper/index.js", dist: "scripts/productivity/jules-helper.user.js" },
+  { name: "Facebook Chess Move Classifier", src: "src/social/fb-chess-classifier/index.js", dist: "scripts/social/fb-chess-classifier.user.js" }
 ];
 
 function bumpVersion(version: string): string {
