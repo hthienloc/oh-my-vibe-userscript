@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibecode Userscript Store</title>
+    <title>Vibecode Userscript Catalog</title>
     <style>
         :root {
             --bg: #ffffff;
@@ -11,6 +11,8 @@
             --accent: #3d5afe;
             --gray: #f5f5f7;
             --border: #e1e1e1;
+            --error-bg: #fff5f5;
+            --error-fg: #e53e3e;
         }
         @media (prefers-color-scheme: dark) {
             :root {
@@ -19,6 +21,8 @@
                 --accent: #536dfe;
                 --gray: #1c1c1e;
                 --border: #333333;
+                --error-bg: #2d1a1a;
+                --error-fg: #fc8181;
             }
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -76,7 +80,7 @@
         }
         .card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .card h3 { font-size: 1.3rem; margin-bottom: 8px; color: var(--fg); }
-        .card p { color: #666; font-size: 0.95rem; margin-bottom: 20px; flex-grow: 1; }
+        .card p { color: #666; font-size: 0.95rem; margin-bottom: 15px; flex-grow: 1; }
         @media (prefers-color-scheme: dark) { .card p { color: #aaa; } }
         
         .tag {
@@ -89,6 +93,19 @@
             background: var(--gray);
             margin-bottom: 12px;
             color: var(--accent);
+        }
+
+        .requirement-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: var(--error-bg);
+            color: var(--error-fg);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            border: 1px solid rgba(229, 62, 62, 0.2);
         }
 
         .btn-install {
@@ -104,19 +121,18 @@
         }
         .btn-install:hover { opacity: 0.9; }
 
-        .footer { margin-top: 80px; text-align: center; color: #888; font-size: 0.9rem; }
-        .hidden { display: none; }
+        .footer { margin-top: 80px; text-align: center; color: #888; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 30px; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Vibecode Userscripts</h1>
-            <p class="subtitle">Các tiện ích mã nguồn mở giúp cải thiện năng suất và trải nghiệm duyệt web.</p>
+            <p class="subtitle">Open-source utilities to enhance productivity and web experience.</p>
         </header>
 
         <div class="search-container">
-            <input type="text" id="search" placeholder="Tìm kiếm script (ví dụ: Zalo, DUT, Facebook...)" autofocus>
+            <input type="text" id="search" placeholder="Search scripts (e.g. Zalo, DUT, Jules...)" autofocus>
         </div>
 
         <div class="grid" id="script-grid">
@@ -124,11 +140,6 @@
         </div>
 
         <div class="footer">
-            <p style="margin-bottom: 15px; font-size: 0.85rem; color: #888; border-top: 1px solid var(--border); padding-top: 25px; line-height: 1.6;">
-                💡 <strong>Note:</strong> Advanced tools like <strong>Jules Helper</strong> require the 
-                <a href="https://github.com/hthienloc/oh-my-vibe-userscript/blob/main/src/productivity/jules-helper/server/relay_server.py" target="_blank" style="color: var(--accent); font-weight: bold;">Python Relay Server</a> 
-                to be running locally for full sync capabilities.
-            </p>
             &copy; 2025 Developed by <strong>hthienloc</strong> • <a href="https://github.com/hthienloc/oh-my-vibe-userscript" style="color: var(--accent);">GitHub Repo</a>
         </div>
     </div>
@@ -137,27 +148,28 @@
         const scripts = [
             {
                 name: "Enhancer for SVDUT",
-                description: "Hiện đại hóa cổng thông tin SV DUT, tích hợp tự động đăng nhập WiFi, quản lý lịch thi và hỗ trợ giải bài tập bằng AI.",
+                description: "Modernizes the SVDUT portal with automatic WiFi login, schedule management, and AI quiz support.",
                 tag: "Academic",
                 url: "scripts/academic/enhancer-for-svdut.user.js"
             },
             {
                 name: "Facebook Affiliate Filter",
-                description: "Tự động nhận diện và ẩn các bình luận chứa link Shopee/Lazada affiliate hoặc nội dung quảng cáo rác trên Facebook.",
+                description: "Automatically hides spam comments and affiliate links on Facebook for a cleaner feed.",
                 tag: "Social",
                 url: "scripts/social/filter-fb-affiliate.user.js"
             },
             {
                 name: "SoundCloud Downloader",
-                description: "Tải nhạc chất lượng cao từ SoundCloud kèm theo đầy đủ metadata (Title, Artist, Album Art) trực tiếp trên trình duyệt.",
+                description: "Download SoundCloud tracks with full ID3 metadata (Title, Artist, Cover Art) directly.",
                 tag: "Media",
                 url: "scripts/media/soundcloud-downloader.user.js"
             },
             {
                 name: "Jules Helper",
-                description: "Công cụ cầu nối giữa Jules AI và Gemini, hỗ trợ đồng bộ tin nhắn và phê duyệt các đề xuất code nhanh chóng.",
+                description: "Bi-directional bridge between Jules AI and Gemini for message syncing and rapid approval.",
                 tag: "Productivity",
-                url: "scripts/productivity/jules-helper.user.js"
+                url: "scripts/productivity/jules-helper.user.js",
+                requiresServer: true
             }
         ];
 
@@ -175,19 +187,27 @@
             filtered.forEach(s => {
                 const card = document.createElement('div');
                 card.className = 'card';
+                
+                let requirementHtml = s.requiresServer ? `
+                    <div class="requirement-badge">
+                        ⚠️ Requires Python Relay Server
+                    </div>
+                ` : '';
+
                 card.innerHTML = `
                     <div>
                         <span class="tag">${s.tag}</span>
                         <h3>${s.name}</h3>
                         <p>${s.description}</p>
+                        ${requirementHtml}
                     </div>
-                    <a href="${s.url}" class="btn-install">Cài đặt ngay</a>
+                    <a href="${s.url}" class="btn-install">Install Now</a>
                 `;
                 grid.appendChild(card);
             });
 
             if (filtered.length === 0) {
-                grid.innerHTML = '<p style="text-align:center; padding: 40px; color:#888;">Không tìm thấy script nào phù hợp.</p>';
+                grid.innerHTML = '<p style="text-align:center; padding: 40px; color:#888;">No matching scripts found.</p>';
             }
         }
 
