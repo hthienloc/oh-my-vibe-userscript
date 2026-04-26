@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.0
+// @version      1.0.1
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -51,29 +51,50 @@
         return null;
     }
 
+    const ASSET_BASE_URL = 'https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/chess-icons/';
+
     function createBadge(cls) {
         const badge = document.createElement('span');
-        badge.textContent = cls.label;
         badge.title = cls.title;
-        Object.assign(badge.style, {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '18px',
-            height: '18px',
-            backgroundColor: cls.color,
-            color: 'white',
-            borderRadius: '50%',
-            fontSize: '10px',
-            fontWeight: 'bold',
+        
+        // Try to load image
+        const img = document.createElement('img');
+        img.src = `${ASSET_BASE_URL}${cls.id}.png`;
+        Object.assign(img.style, {
+            width: '20px',
+            height: '20px',
             marginLeft: '8px',
-            cursor: 'help',
-            flexShrink: '0',
             verticalAlign: 'middle',
-            fontFamily: 'sans-serif',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-            userSelect: 'none'
+            display: 'inline-block',
+            flexShrink: '0'
         });
+
+        // Fallback to text badge if image fails to load
+        img.onerror = () => {
+            img.style.display = 'none';
+            badge.textContent = cls.label;
+            Object.assign(badge.style, {
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                backgroundColor: cls.color,
+                color: 'white',
+                borderRadius: '50%',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                marginLeft: '8px',
+                cursor: 'help',
+                flexShrink: '0',
+                verticalAlign: 'middle',
+                fontFamily: 'sans-serif',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                userSelect: 'none'
+            });
+        };
+
+        badge.appendChild(img);
         return badge;
     }
 
