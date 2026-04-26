@@ -122,6 +122,133 @@
         .btn-install:hover { opacity: 0.9; }
 
         .footer { margin-top: 80px; text-align: center; color: #888; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 30px; }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 1000;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: var(--bg);
+            width: 90%;
+            max-width: 700px;
+            max-height: 90vh;
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            transform: translateY(20px);
+            transition: transform 0.3s;
+            border: 1px solid var(--border);
+        }
+        @media (prefers-color-scheme: dark) {
+            .modal-content {
+                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            }
+        }
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .modal-title-group h2 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            color: var(--fg);
+        }
+        .modal-title-group .modal-meta {
+            color: #888;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .modal-close {
+            background: var(--gray);
+            border: none;
+            color: var(--fg);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+        }
+        .modal-close:hover {
+            background: var(--border);
+        }
+        .modal-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 10px; /* Space for scrollbar */
+        }
+        .modal-body p {
+            margin-bottom: 20px;
+            color: var(--fg);
+        }
+        .code-preview-container {
+            background: var(--gray);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .code-preview-container pre {
+            margin: 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.85rem;
+            color: var(--fg);
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+        .btn-secondary {
+            padding: 12px 24px;
+            background: var(--gray);
+            color: var(--fg);
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+        .card h3 { font-size: 1.3rem; margin-bottom: 8px; color: var(--fg); cursor: pointer; transition: color 0.2s; }
+        .card h3:hover { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -144,28 +271,59 @@
         </div>
     </div>
 
+    <!-- Script Detail Modal -->
+    <div class="modal-overlay" id="script-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <h2 id="modal-title">Script Name</h2>
+                    <div class="modal-meta">
+                        <span class="tag" id="modal-tag" style="margin-bottom: 0;">Tag</span>
+                        <span id="modal-version">v1.0.0</span>
+                    </div>
+                </div>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-desc">Description goes here.</p>
+                <div id="modal-requirement" style="display: none;"></div>
+                <div class="code-preview-container">
+                    <pre><code id="modal-code">Loading source code...</code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="modal-btn-close">Close</button>
+                <a href="#" class="btn-install" id="modal-btn-install" style="display: inline-block;">Install Now</a>
+            </div>
+        </div>
+    </div>
+
     <script>
         const scripts = [
             {
                 name: "Enhancer for SVDUT",
+                version: "1.4.31",
                 description: "Modernizes the SVDUT portal with automatic WiFi login, schedule management, and AI quiz support.",
                 tag: "Academic",
                 url: "scripts/academic/enhancer-for-svdut.user.js"
             },
             {
                 name: "Facebook Affiliate Filter",
+                version: "1.0",
                 description: "Automatically hides spam comments and affiliate links on Facebook for a cleaner feed.",
                 tag: "Social",
                 url: "scripts/social/filter-fb-affiliate.user.js"
             },
             {
                 name: "SoundCloud Downloader",
+                version: "1.3.4",
                 description: "Download SoundCloud tracks with full ID3 metadata (Title, Artist, Cover Art) directly.",
                 tag: "Media",
                 url: "scripts/media/soundcloud-downloader.user.js"
             },
             {
                 name: "Jules Helper",
+                version: "3.4",
                 description: "Bi-directional bridge between Jules AI and Gemini for message syncing and rapid approval.",
                 tag: "Productivity",
                 url: "scripts/productivity/jules-helper.user.js",
@@ -197,7 +355,7 @@
                 card.innerHTML = `
                     <div>
                         <span class="tag">${s.tag}</span>
-                        <h3>${s.name}</h3>
+                        <h3 class="script-title" data-script-index="${scripts.indexOf(s)}">${s.name}</h3>
                         <p>${s.description}</p>
                         ${requirementHtml}
                     </div>
@@ -209,7 +367,72 @@
             if (filtered.length === 0) {
                 grid.innerHTML = '<p style="text-align:center; padding: 40px; color:#888;">No matching scripts found.</p>';
             }
+            
+            // Attach click listeners to titles
+            document.querySelectorAll('.script-title').forEach(title => {
+                title.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-script-index');
+                    openModal(scripts[index]);
+                });
+            });
         }
+        
+        // Modal logic
+        const modal = document.getElementById('script-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalTag = document.getElementById('modal-tag');
+        const modalVersion = document.getElementById('modal-version');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalRequirement = document.getElementById('modal-requirement');
+        const modalCode = document.getElementById('modal-code');
+        const modalBtnInstall = document.getElementById('modal-btn-install');
+        const modalCloseBtn = document.getElementById('modal-close');
+        const modalBtnClose = document.getElementById('modal-btn-close');
+
+        function openModal(script) {
+            modalTitle.textContent = script.name;
+            modalTag.textContent = script.tag;
+            modalVersion.textContent = `v${script.version}`;
+            modalDesc.textContent = script.description;
+            
+            if (script.requiresServer) {
+                modalRequirement.innerHTML = `
+                    <div class="requirement-badge">
+                        ⚠️ Requires <a href="https://github.com/hthienloc/oh-my-vibe-userscript/blob/main/src/productivity/jules-helper/server/relay_server.py" target="_blank" style="color: inherit; text-decoration: underline;">Python Relay Server</a>
+                    </div>
+                `;
+                modalRequirement.style.display = 'block';
+            } else {
+                modalRequirement.style.display = 'none';
+            }
+            
+            modalBtnInstall.href = script.url;
+            modalCode.textContent = "Loading source code...";
+            
+            modal.classList.add('active');
+            
+            // Fetch source code
+            fetch(script.url)
+                .then(res => res.text())
+                .then(code => {
+                    modalCode.textContent = code;
+                })
+                .catch(err => {
+                    modalCode.textContent = "Error loading source code.";
+                });
+        }
+        
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+        
+        modalCloseBtn.addEventListener('click', closeModal);
+        modalBtnClose.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
 
         search.addEventListener('input', (e) => render(e.target.value));
         render();
