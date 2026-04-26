@@ -1,4 +1,4 @@
-# Vibecode Userscript Collection 🛡️
+# Userscript Collection 🛡️
 
 A centralized monorepo containing curated, high-performance userscripts designed to enhance web productivity and academic workflows.
 
@@ -7,7 +7,7 @@ A centralized monorepo containing curated, high-performance userscripts designed
 
 ## Project Overview
 
-This repository serves as a professional hub for various userscripts developed under the **Vibecode** ecosystem. By utilizing a monorepo architecture, we ensure consistent coding standards, shared build logic, and synchronized versioning across all distributed components.
+This repository serves as a personal hub for various userscripts. By utilizing a monorepo architecture, we ensure consistent coding standards, shared build logic, and synchronized versioning across all distributed components.
 
 ## 📦 Core Components
 
