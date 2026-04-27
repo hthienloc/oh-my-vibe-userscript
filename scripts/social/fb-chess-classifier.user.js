@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.17
+// @version      1.0.18
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -39,9 +39,11 @@
         let score = 0;
         const lowerText = text.toLowerCase();
         
+        const applyCriticalHit = (pts) => Math.random() < 0.20 ? pts * 2 : pts;
+
         // --- Penalties ---
         // Profanity
-        if (CLASSIFICATIONS.BLUNDER.keywords.some(k => lowerText.includes(k))) score -= 50;
+        if (CLASSIFICATIONS.BLUNDER.keywords.some(k => lowerText.includes(k))) score -= applyCriticalHit(50);
         
         // Excessive emojis (>3 in a row)
         const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}){4,}/gu;
@@ -61,12 +63,12 @@
         if (/(.)\1{4,}/i.test(text)) score -= 10;
 
         // Negative keywords
-        if (CLASSIFICATIONS.MISTAKE.keywords.some(k => lowerText.includes(k))) score -= 20;
-        if (CLASSIFICATIONS.MISS.keywords.some(k => lowerText.includes(k))) score -= 15;
-        if (CLASSIFICATIONS.INACCURACY.keywords.some(k => lowerText.includes(k))) score -= 10;
+        if (CLASSIFICATIONS.MISTAKE.keywords.some(k => lowerText.includes(k))) score -= applyCriticalHit(20);
+        if (CLASSIFICATIONS.MISS.keywords.some(k => lowerText.includes(k))) score -= applyCriticalHit(15);
+        if (CLASSIFICATIONS.INACCURACY.keywords.some(k => lowerText.includes(k))) score -= applyCriticalHit(10);
         
         const teencodeKeywords = ['k', 'ko', 'dc', 'đc', 'v', 'm', 't', 'ae', 'r', 'j'];
-        if (teencodeKeywords.some(k => lowerText.includes(k))) score -= 2;
+        if (teencodeKeywords.some(k => lowerText.includes(k))) score -= applyCriticalHit(2);
 
         // --- Rewards ---
         // Proper punctuation
@@ -79,11 +81,11 @@
         if (/^[A-Z]/.test(text) && /[.!?]$/.test(text.trim())) score += 10;
         
         // Professional and positive keywords
-        if (CLASSIFICATIONS.BRILLIANT.keywords.some(k => lowerText.includes(k))) score += 30;
-        else if (CLASSIFICATIONS.GREAT.keywords.some(k => lowerText.includes(k))) score += 20;
-        else if (CLASSIFICATIONS.EXCELLENT.keywords.some(k => lowerText.includes(k))) score += 15;
-        else if (CLASSIFICATIONS.BEST.keywords.some(k => lowerText.includes(k))) score += 10;
-        else if (CLASSIFICATIONS.GOOD.keywords.some(k => lowerText.includes(k))) score += 5;
+        if (CLASSIFICATIONS.BRILLIANT.keywords.some(k => lowerText.includes(k))) score += applyCriticalHit(30);
+        else if (CLASSIFICATIONS.GREAT.keywords.some(k => lowerText.includes(k))) score += applyCriticalHit(20);
+        else if (CLASSIFICATIONS.EXCELLENT.keywords.some(k => lowerText.includes(k))) score += applyCriticalHit(15);
+        else if (CLASSIFICATIONS.BEST.keywords.some(k => lowerText.includes(k))) score += applyCriticalHit(10);
+        else if (CLASSIFICATIONS.GOOD.keywords.some(k => lowerText.includes(k))) score += applyCriticalHit(5);
 
         // Book move fallback
         if (score === 0 && CLASSIFICATIONS.BOOK.keywords.some(k => lowerText.includes(k))) {
@@ -91,29 +93,48 @@
         }
 
         // Apply chaos factor
-        score += (Math.random() * 10 - 5);
+        score += (Math.random() * 40 - 20);
+
+        // Length-based variance
+        if (text.length < 8) {
+            // High chance to be BEST or BOOK
+            if (Math.random() < 0.3) score += 15; // Push towards BEST
+            if (Math.random() < 0.2) return CLASSIFICATIONS.BOOK; // Push towards BOOK
+        } else if (text.length > 30) {
+            // Wild fluctuation between EXCELLENT and INACCURACY
+            if (Math.random() < 0.5) {
+                score += (Math.random() * 30 + 10); // Push high
+            } else {
+                score -= (Math.random() * 20 + 5); // Push low
+            }
+        }
 
         // --- Thresholds ---
         let result;
-        if (score <= -40) result = CLASSIFICATIONS.BLUNDER;
-        else if (score <= -20) result = CLASSIFICATIONS.MISTAKE;
-        else if (score <= -15) result = CLASSIFICATIONS.MISS;
-        else if (score < -5) result = CLASSIFICATIONS.INACCURACY;
-        else if (score >= 35) result = CLASSIFICATIONS.BRILLIANT;
-        else if (score >= 25) result = CLASSIFICATIONS.EXCELLENT;
-        else if (score >= 15) result = CLASSIFICATIONS.BEST;
-        else result = CLASSIFICATIONS.GOOD;
-
-        // Luck Promotion
-        if (score > 0 && Math.random() < 0.01) {
-            return CLASSIFICATIONS.BRILLIANT;
+        if (score <= -31) result = CLASSIFICATIONS.BLUNDER;
+        else if (score <= -21) result = CLASSIFICATIONS.MISS;
+        else if (score <= -11) result = CLASSIFICATIONS.MISTAKE;
+        else if (score <= -1) result = CLASSIFICATIONS.INACCURACY;
+        else if (score >= 40) result = CLASSIFICATIONS.BRILLIANT;
+        else if (score >= 30) result = CLASSIFICATIONS.EXCELLENT;
+        else if (score >= 20) result = CLASSIFICATIONS.GREAT;
+        else if (score >= 10) result = CLASSIFICATIONS.BEST;
+        else {
+            // score is 0 to 9, so initially GOOD
+            result = CLASSIFICATIONS.GOOD;
+            
+            // Tighten 'GOOD' further
+            if (score < 5 && Math.random() < 0.5) {
+               result = score < 2 ? CLASSIFICATIONS.INACCURACY : CLASSIFICATIONS.BOOK;
+            }
         }
 
-        const isShort = text.length < 20;
-        const isTrendy = CLASSIFICATIONS.GREAT.keywords.some(k => lowerText.includes(k));
-        if (isShort && isTrendy && Math.random() < 0.10) {
-            return CLASSIFICATIONS.GREAT;
-        }
+        // Multi-tier Luck System
+        const luck = Math.random();
+        if (luck < 0.01) return CLASSIFICATIONS.BRILLIANT;
+        if (luck < 0.06) return CLASSIFICATIONS.GREAT;
+        if (luck < 0.16) return CLASSIFICATIONS.BEST;
+        if (luck < 0.21) return CLASSIFICATIONS.BOOK;
 
         return result;
     }
