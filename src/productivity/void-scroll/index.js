@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
+// @version      1.0.3
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
 // @author       Vibecode
 // @match        https://*.youtube.com/*
@@ -53,11 +53,27 @@
                 letter-spacing: 0.5px;
                 text-align: center;
                 padding: 0 20px;
+                z-index: 2;
             }
             #void-scroll-timer {
                 font-size: 48px;
                 font-weight: 100;
                 font-variant-numeric: tabular-nums;
+                z-index: 2;
+            }
+            #void-scroll-breath {
+                position: absolute;
+                width: 200px;
+                height: 200px;
+                border-radius: 50%;
+                background-color: rgba(255, 255, 255, 0.05);
+                animation: breathe 8s infinite ease-in-out;
+                z-index: 1;
+                pointer-events: none;
+            }
+            @keyframes breathe {
+                0%, 100% { transform: scale(1); opacity: 0.2; }
+                50% { transform: scale(1.5); opacity: 0.6; }
             }
             body.void-scroll-locked {
                 overflow: hidden !important;
@@ -98,6 +114,16 @@
             return;
         }
 
+        // Audio-Kill via Redirection
+        document.querySelectorAll('video').forEach(v => {
+            try { v.pause(); } catch (e) {}
+        });
+
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
+            // Show overlay during the redirection delay to maintain immersion
+        }
+
         showOverlay(lockUntil);
     };
 
@@ -110,6 +136,7 @@
             overlay = document.createElement('div');
             overlay.id = 'void-scroll-overlay';
             overlay.innerHTML = `
+                <div id="void-scroll-breath"></div>
                 <div id="void-scroll-message">Time to reflect. Look at the void for a moment.</div>
                 <div id="void-scroll-timer"></div>
             `;
