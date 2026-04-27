@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Gemini Prompt Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  A Categorized Quick-Prompt Userscript for Google Gemini
 // @match        https://gemini.google.com/app*
 // @grant        none
+// @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/gemini-prompt-pro.user.js
+// @downloadURL  https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/gemini-prompt-pro.user.js
 // ==/UserScript==
 
 (function() {
