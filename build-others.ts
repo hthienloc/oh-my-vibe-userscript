@@ -5,7 +5,8 @@ const scriptsToSync = [
   { name: "Facebook Affiliate Filter", src: "src/social/filter-fb-affiliate/index.js", dist: "scripts/social/filter-fb-affiliate.user.js" },
   { name: "SoundCloud Downloader", src: "src/media/soundcloud-downloader/index.js", dist: "scripts/media/soundcloud-downloader.user.js" },
   { name: "Jules Helper", src: "src/productivity/jules-helper/index.js", dist: "scripts/productivity/jules-helper.user.js" },
-  { name: "Facebook Chess Move Classifier", src: "src/social/fb-chess-classifier/index.js", dist: "scripts/social/fb-chess-classifier.user.js" }
+  { name: "Facebook Chess Move Classifier", src: "src/social/fb-chess-classifier/index.js", dist: "scripts/social/fb-chess-classifier.user.js" },
+  { name: "Gemini Prompt Pro", src: "src/productivity/gemini-prompt-pro/index.js", dist: "scripts/productivity/gemini-prompt-pro.user.js" }
 ];
 
 function bumpVersion(version: string): string {
