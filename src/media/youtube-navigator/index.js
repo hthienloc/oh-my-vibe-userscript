@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.1
+// @version      1.0.2
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Ctrl+Enter to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -22,15 +22,31 @@
     const style = document.createElement('style');
     style.textContent = `
         .${FOCUS_CLASS} {
-            outline: 4px solid #ff0000 !important;
-            outline-offset: -4px !important;
+            outline: 4px solid #ff69b4 !important; /* Hot Pink */
+            outline-offset: 4px !important; /* Move border outside */
             border-radius: 8px !important;
-            box-shadow: 0 0 10px rgba(255,0,0,0.5) !important;
+            box-shadow: 0 0 15px rgba(255,105,180,0.6) !important;
             transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out !important;
-            z-index: 10 !important;
+            z-index: 9999 !important;
+            position: relative !important;
         }
     `;
     document.head.appendChild(style);
+
+    function initAutoSelect() {
+        const items = getItems();
+        if (items.length > 0 && currentIndex === -1) {
+            updateFocus(items, 0);
+        }
+    }
+
+    // Run on initial load
+    setTimeout(initAutoSelect, 2000); // Wait for YT to load content
+    
+    // Check periodically if content changes
+    setInterval(() => {
+        if (currentIndex === -1) initAutoSelect();
+    }, 3000);
 
     function getItems() {
         const items = Array.from(document.querySelectorAll(SELECTORS));
