@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.6
+// @version      1.0.5
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -20,6 +20,7 @@
     const FOCUS_CLASS = 'yt-keyboard-focused';
     let currentIndex = -1;
     let isSearchFocused = false;
+    let hoverTimeout = null;
 
     // Inject CSS for visual feedback
     const style = document.createElement('style');
@@ -243,15 +244,52 @@
         return items.indexOf(nextItem);
     }
 
+    function getPreviewTarget(item) {
+        return item.querySelector('ytd-thumbnail') || item.querySelector('a#thumbnail');
+    }
+
+    function cancelHover() {
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
+    }
+
+    function triggerHoverLeave(item) {
+        const target = getPreviewTarget(item);
+        if (target) {
+            target.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+            target.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+        }
+    }
+
+    function triggerHoverEnter(item) {
+        const target = getPreviewTarget(item);
+        if (target) {
+            target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+            target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        }
+    }
+
     function updateFocus(items, newIndex) {
         if (currentIndex >= 0 && currentIndex < items.length) {
-            items[currentIndex].classList.remove(FOCUS_CLASS);
+            const oldItem = items[currentIndex];
+            oldItem.classList.remove(FOCUS_CLASS);
+            cancelHover();
+            triggerHoverLeave(oldItem);
         }
+        
         currentIndex = newIndex;
+        
         if (currentIndex >= 0 && currentIndex < items.length) {
             const el = items[currentIndex];
             el.classList.add(FOCUS_CLASS);
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            cancelHover();
+            hoverTimeout = setTimeout(() => {
+                triggerHoverEnter(el);
+            }, 400);
         }
     }
 
@@ -273,6 +311,13 @@
         const target = e.target;
         if (target && target.tagName && target.tagName.toLowerCase() === 'input' && target.id === 'search') {
             isSearchFocused = true;
+            cancelHover();
+            if (currentIndex >= 0) {
+                const items = getItems();
+                if (currentIndex < items.length) {
+                    triggerHoverLeave(items[currentIndex]);
+                }
+            }
             const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
             focusedElements.forEach(el => el.classList.remove(FOCUS_CLASS));
         }
@@ -339,6 +384,13 @@
 
     // Handle YouTube SPA Navigation
     document.addEventListener('yt-navigate-start', () => {
+        cancelHover();
+        if (currentIndex >= 0) {
+            const items = getItems();
+            if (currentIndex < items.length) {
+                triggerHoverLeave(items[currentIndex]);
+            }
+        }
         currentIndex = -1;
         const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
         focusedElements.forEach(el => el.classList.remove(FOCUS_CLASS));
