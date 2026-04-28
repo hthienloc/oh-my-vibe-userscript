@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.6
+// @version      1.0.7
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
 // @author       Vibecode
 // @match        https://*.youtube.com/*
@@ -20,8 +20,8 @@
     const STORAGE_KEY_LOCK = 'void_scroll_lock_until';
     const STORAGE_KEY_STATS_DATE = 'void_scroll_stats_date';
     const STORAGE_KEY_STATS_COUNT = 'void_scroll_stats_count';
-    const MAX_PUNISHMENT_MS = 120 * 1000;
-    const PUNISHMENT_INCREMENT_MS = 10 * 1000;
+    const MAX_PUNISHMENT_MS = 60 * 1000;
+    const PUNISHMENT_INCREMENT_MS = 5 * 1000;
     
     const SARCASTIC_MESSAGES = [
         "Really?",
@@ -193,8 +193,26 @@
         const timerEl = document.getElementById('void-scroll-timer');
         const messageEl = document.getElementById('void-scroll-message');
 
+        let lastActivityTime = 0;
+        let lastFrameTime = Date.now();
+        let lastMessageTime = 0;
+        let lastPunishmentTime = 0;
+        let lastSyncTime = Date.now();
+
         const updateTimer = () => {
             const now = Date.now();
+            const elapsed = now - lastFrameTime;
+            lastFrameTime = now;
+
+            if (now - lastActivityTime < 1000) {
+                lockUntil += elapsed;
+            }
+
+            if (now - lastSyncTime > 500) {
+                setLockTime(Math.ceil(lockUntil));
+                lastSyncTime = now;
+            }
+
             const remaining = Math.max(0, Math.ceil((lockUntil - now) / 1000));
             timerEl.textContent = remaining;
 
@@ -212,17 +230,26 @@
             e.stopPropagation();
             e.preventDefault();
             
+            const now = Date.now();
+            lastActivityTime = now;
+            
             if (e.type === 'wheel' || e.type === 'touchmove') {
-                const now = Date.now();
-                const currentRemaining = lockUntil - now;
-                if (currentRemaining < MAX_PUNISHMENT_MS) {
-                    lockUntil = Math.min(now + MAX_PUNISHMENT_MS, lockUntil + PUNISHMENT_INCREMENT_MS);
-                    setLockTime(lockUntil);
-                    
-                    const randomMessage = SARCASTIC_MESSAGES[Math.floor(Math.random() * SARCASTIC_MESSAGES.length)];
-                    if (messageEl) {
-                        messageEl.textContent = randomMessage;
+                if (now - lastPunishmentTime > 2000) {
+                    lastPunishmentTime = now;
+                    const currentRemaining = lockUntil - now;
+                    if (currentRemaining < MAX_PUNISHMENT_MS) {
+                        lockUntil = Math.min(now + MAX_PUNISHMENT_MS, lockUntil + PUNISHMENT_INCREMENT_MS);
+                        setLockTime(Math.ceil(lockUntil));
+                        lastSyncTime = now;
                     }
+                }
+            }
+
+            if (now - lastMessageTime > 2000) {
+                lastMessageTime = now;
+                const randomMessage = SARCASTIC_MESSAGES[Math.floor(Math.random() * SARCASTIC_MESSAGES.length)];
+                if (messageEl) {
+                    messageEl.textContent = randomMessage;
                 }
             }
         };

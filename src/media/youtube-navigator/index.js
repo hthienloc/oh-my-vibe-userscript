@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.8
+// @version      1.0.9
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -26,8 +26,8 @@
     const style = document.createElement('style');
     style.textContent = `
         .${FOCUS_CLASS} {
-            outline: 4px solid #ff69b4 !important; /* Hot Pink */
-            outline-offset: 4px !important; /* Move border outside */
+            outline: 4px solid rgba(255, 105, 180, 0.7) !important; /* Hot Pink */
+            outline-offset: 8px !important; /* Move border outside */
             border-radius: 8px !important;
             box-shadow: 0 0 15px rgba(255,105,180,0.6) !important;
             transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out !important;
@@ -78,52 +78,103 @@
         }
         if (videoItems.length === 0) return { rows: [], itemToPos: new Map() };
         
-        // Sort items vertically to ensure correct row grouping regardless of DOM order
-        videoItems.sort((a, b) => {
-            const rectA = a.getBoundingClientRect();
-            const rectB = b.getBoundingClientRect();
-            return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
-        });
-
         let rows = [];
-        let currentRow = [];
-        let currentY = -1;
-        let currentHeight = 0;
-
-        for (let i = 0; i < videoItems.length; i++) {
-            const item = videoItems[i];
-            const rect = item.getBoundingClientRect();
-            const centerY = rect.top + rect.height / 2;
-            
-            if (currentRow.length === 0) {
-                currentRow.push(item);
-                currentY = centerY;
-                currentHeight = rect.height;
-            } else {
-                // Tolerance for items in the same row
-                if (Math.abs(centerY - currentY) < Math.max(60, currentHeight / 3)) {
-                    currentRow.push(item);
-                } else {
-                    rows.push(currentRow);
-                    currentRow = [item];
-                    currentY = centerY;
-                    currentHeight = rect.height;
+        
+        // Attempt to group by YouTube's native rich grid rows
+        const richGridRows = Array.from(document.querySelectorAll('ytd-rich-grid-row'));
+        if (richGridRows.length > 0) {
+            for (let i = 0; i < richGridRows.length; i++) {
+                const rowEl = richGridRows[i];
+                // Find videoItems that are descendants of this row
+                const itemsInRow = [];
+                for (let j = 0; j < videoItems.length; j++) {
+                    if (rowEl.contains(videoItems[j])) {
+                        itemsInRow.push(videoItems[j]);
+                    }
+                }
+                
+                if (itemsInRow.length > 0) {
+                    // Sort items in this row by their visual left position
+                    itemsInRow.sort((a, b) => {
+                        const rectA = a.getBoundingClientRect();
+                        const rectB = b.getBoundingClientRect();
+                        return rectA.left - rectB.left;
+                    });
+                    rows.push(itemsInRow);
                 }
             }
         }
-        if (currentRow.length > 0) {
-            rows.push(currentRow);
+        
+        // If no rich grid rows found (e.g. search page or list view) or some items were not captured, fallback to pixel math
+        let capturedItems = new Set();
+        for (let i = 0; i < rows.length; i++) {
+            for (let j = 0; j < rows[i].length; j++) {
+                capturedItems.add(rows[i][j]);
+            }
+        }
+        
+        if (capturedItems.size < videoItems.length) {
+            // We need to fallback to pixel math for uncaptured items or all items if richGridRows was empty
+            const remainingItems = videoItems.filter(item => !capturedItems.has(item));
+            
+            // Sort vertically
+            remainingItems.sort((a, b) => {
+                const rectA = a.getBoundingClientRect();
+                const rectB = b.getBoundingClientRect();
+                return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
+            });
+            
+            let fallbackRows = [];
+            let currentRow = [];
+            let currentY = -1;
+            let currentHeight = 0;
+
+            for (let i = 0; i < remainingItems.length; i++) {
+                const item = remainingItems[i];
+                const rect = item.getBoundingClientRect();
+                const centerY = rect.top + rect.height / 2;
+                
+                if (currentRow.length === 0) {
+                    currentRow.push(item);
+                    currentY = centerY;
+                    currentHeight = rect.height;
+                } else {
+                    if (Math.abs(centerY - currentY) < Math.max(60, currentHeight / 3)) {
+                        currentRow.push(item);
+                    } else {
+                        fallbackRows.push(currentRow);
+                        currentRow = [item];
+                        currentY = centerY;
+                        currentHeight = rect.height;
+                    }
+                }
+            }
+            if (currentRow.length > 0) {
+                fallbackRows.push(currentRow);
+            }
+            
+            for (let i = 0; i < fallbackRows.length; i++) {
+                fallbackRows[i].sort((a, b) => {
+                    const rectA = a.getBoundingClientRect();
+                    const rectB = b.getBoundingClientRect();
+                    return rectA.left - rectB.left;
+                });
+                rows.push(fallbackRows[i]);
+            }
+            
+            // Sort all rows by vertical position to ensure correct Up/Down navigation
+            rows.sort((rowA, rowB) => {
+                if (rowA.length === 0) return 0;
+                if (rowB.length === 0) return 0;
+                const rectA = rowA[0].getBoundingClientRect();
+                const rectB = rowB[0].getBoundingClientRect();
+                return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
+            });
         }
 
         const itemToPos = new Map();
         for (let rIdx = 0; rIdx < rows.length; rIdx++) {
             const row = rows[rIdx];
-            // Sort items in a row by their X coordinate to ensure correct L/R navigation
-            row.sort((a, b) => {
-                const rectA = a.getBoundingClientRect();
-                const rectB = b.getBoundingClientRect();
-                return rectA.left - rectB.left;
-            });
             for (let cIdx = 0; cIdx < row.length; cIdx++) {
                 itemToPos.set(row[cIdx], { r: rIdx, c: cIdx });
             }
@@ -265,6 +316,13 @@
         return item.querySelector('ytd-thumbnail') || item.querySelector('a#thumbnail');
     }
 
+    function clearAllHighlights() {
+        const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
+        for (let i = 0; i < focusedElements.length; i++) {
+            focusedElements[i].classList.remove(FOCUS_CLASS);
+        }
+    }
+
     function cancelHover() {
         if (hoverTimeout) {
             clearTimeout(hoverTimeout);
@@ -280,6 +338,14 @@
             target.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
             target.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
         }
+        
+        const preview = item.querySelector('ytd-video-preview');
+        if (preview) {
+            preview.active = false;
+            preview.playing = false;
+            preview.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+            preview.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+        }
     }
 
     function triggerHoverEnter(item) {
@@ -291,16 +357,24 @@
             target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
             target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         }
+        
+        const preview = item.querySelector('ytd-video-preview');
+        if (preview) {
+            preview.active = true;
+            preview.playing = true;
+            preview.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+            preview.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        }
     }
 
     function updateFocus(items, newIndex) {
         if (currentIndex >= 0 && currentIndex < items.length) {
             const oldItem = items[currentIndex];
-            oldItem.classList.remove(FOCUS_CLASS);
             cancelHover();
             triggerHoverLeave(oldItem);
         }
         
+        clearAllHighlights();
         currentIndex = newIndex;
         
         if (currentIndex >= 0 && currentIndex < items.length) {
@@ -340,8 +414,7 @@
                     triggerHoverLeave(items[currentIndex]);
                 }
             }
-            const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
-            focusedElements.forEach(el => el.classList.remove(FOCUS_CLASS));
+            clearAllHighlights();
         }
     });
 
@@ -414,8 +487,7 @@
             }
         }
         currentIndex = -1;
-        const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
-        focusedElements.forEach(el => el.classList.remove(FOCUS_CLASS));
+        clearAllHighlights();
     });
 
 })();
