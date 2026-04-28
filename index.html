@@ -33,7 +33,7 @@
             line-height: 1.5;
             padding: 40px 20px;
         }
-        .container { max-width: 800px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         header { margin-bottom: 60px; text-align: center; }
         h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
         p.subtitle { color: #888; font-size: 1.1rem; }
@@ -42,7 +42,7 @@
             position: sticky;
             top: 20px;
             z-index: 100;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
         #search {
             width: 100%;
@@ -58,10 +58,43 @@
         }
         #search:focus { border-color: var(--accent); box-shadow: 0 4px 25px rgba(61, 90, 254, 0.15); }
 
+        .tag-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 40px;
+            justify-content: center;
+        }
+        .tag-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: var(--gray);
+            color: var(--fg);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .tag-chip:hover {
+            background: var(--border);
+        }
+        .tag-chip.active {
+            background: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+        }
+
         .grid { 
             display: grid; 
             gap: 24px; 
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+        }
+        @media (max-width: 1024px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         @media (max-width: 768px) {
             .grid {
@@ -262,6 +295,14 @@
             <input type="text" id="search" placeholder="Search scripts (e.g. Zalo, DUT, Jules...)" autofocus>
         </div>
 
+        <div class="tag-filters" id="tag-filters">
+            <div class="tag-chip active" data-tag="">All</div>
+            <div class="tag-chip" data-tag="Social">Social</div>
+            <div class="tag-chip" data-tag="Media">Media</div>
+            <div class="tag-chip" data-tag="Productivity">Productivity</div>
+            <div class="tag-chip" data-tag="Academic">Academic</div>
+        </div>
+
         <div class="grid" id="script-grid">
             <!-- Scripts will be injected here -->
         </div>
@@ -361,14 +402,18 @@
 
         const grid = document.getElementById('script-grid');
         const search = document.getElementById('search');
+        
+        let currentSearch = '';
+        let currentTag = '';
 
-        function render(filter = '') {
+        function render() {
             grid.innerHTML = '';
-            const filtered = scripts.filter(s => 
-                s.name.toLowerCase().includes(filter.toLowerCase()) || 
-                s.description.toLowerCase().includes(filter.toLowerCase()) ||
-                s.tag.toLowerCase().includes(filter.toLowerCase())
-            );
+            const filtered = scripts.filter(s => {
+                const searchMatch = s.name.toLowerCase().includes(currentSearch.toLowerCase()) || 
+                                    s.description.toLowerCase().includes(currentSearch.toLowerCase());
+                const tagMatch = currentTag === '' || s.tag === currentTag;
+                return searchMatch && tagMatch;
+            });
 
             filtered.forEach(s => {
                 const card = document.createElement('div');
@@ -462,7 +507,25 @@
             }
         });
 
-        search.addEventListener('input', (e) => render(e.target.value));
+        // Event listeners for filtering
+        search.addEventListener('input', (e) => {
+            currentSearch = e.target.value;
+            render();
+        });
+
+        const tagChips = document.querySelectorAll('.tag-chip');
+        tagChips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                // Update active state
+                tagChips.forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update currentTag and render
+                currentTag = e.target.getAttribute('data-tag');
+                render();
+            });
+        });
+
         render();
     </script>
 </body>
