@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.2
+// @version      1.0.3
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Ctrl+Enter to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -168,6 +168,10 @@
     }
 
     function getLink(item) {
+        const links = item.querySelectorAll('a[href*="watch?v="]');
+        if (links.length > 0) {
+            return links[0];
+        }
         return item.querySelector('a#thumbnail') || item.querySelector('a.ytd-thumbnail') || item.querySelector('a.yt-simple-endpoint');
     }
 
@@ -199,21 +203,10 @@
                         e.preventDefault();
                         if (e.ctrlKey || e.metaKey) {
                             // Open in new background tab
-                            const event = new MouseEvent('click', {
-                                bubbles: true,
-                                cancelable: true,
-                                view: window,
-                                ctrlKey: true,
-                                metaKey: e.metaKey
-                            });
-                            link.dispatchEvent(event);
-                            
-                            // Fallback if event dispatching is blocked
-                            if (!event.defaultPrevented && !e.ctrlKey) {
-                                window.open(link.href, '_blank');
-                            }
+                            window.open(link.href, '_blank');
                         } else {
-                            link.click();
+                            // Open in current tab
+                            window.location.href = link.href;
                         }
                     }
                 }
