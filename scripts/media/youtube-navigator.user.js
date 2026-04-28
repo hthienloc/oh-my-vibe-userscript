@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.3
+// @version      1.0.6
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -14,9 +14,12 @@
 (function() {
     'use strict';
 
-    const SELECTORS = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer';
+    const VIDEO_SELECTORS = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer';
+    const SIDEBAR_SELECTORS = 'ytd-guide-entry-renderer, #endpoint.yt-guide-entry-renderer';
+    const SELECTORS = `${VIDEO_SELECTORS}, ${SIDEBAR_SELECTORS}`;
     const FOCUS_CLASS = 'yt-keyboard-focused';
     let currentIndex = -1;
+    let isSearchFocused = false;
 
     // Inject CSS for visual feedback
     const style = document.createElement('style');
@@ -27,17 +30,23 @@
             border-radius: 8px !important;
             box-shadow: 0 0 15px rgba(255,105,180,0.6) !important;
             transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out !important;
-            z-index: 9999 !important;
+            z-index: 100 !important;
             position: relative !important;
         }
     `;
     document.head.appendChild(style);
 
     function initAutoSelect() {
+        if (isSearchFocused) return;
         const items = getItems();
         if (items.length > 0 && currentIndex === -1) {
-            updateFocus(items, 0);
+            const firstVideoIndex = items.findIndex(item => !isSidebarItem(item));
+            updateFocus(items, firstVideoIndex >= 0 ? firstVideoIndex : 0);
         }
+    }
+
+    function isSidebarItem(item) {
+        return item.matches(SIDEBAR_SELECTORS);
     }
 
     // Run on initial load
@@ -60,13 +69,14 @@
     }
 
     function getGrid(items) {
-        if (items.length === 0) return { rows: [], itemToPos: new Map() };
+        const videoItems = items.filter(item => !isSidebarItem(item));
+        if (videoItems.length === 0) return { rows: [], itemToPos: new Map() };
         
         let rows = [];
         let currentRow = [];
         let currentY = -1;
 
-        for (const item of items) {
+        for (const item of videoItems) {
             const rect = item.getBoundingClientRect();
             const centerY = rect.top + rect.height / 2;
             
@@ -106,6 +116,59 @@
 
     function findNextIndex(items, currentIdx, direction) {
         if (currentIdx < 0) return 0;
+        
+        const currentItem = items[currentIdx];
+        
+        if (isSidebarItem(currentItem)) {
+            return findNextSidebarIndex(items, currentIdx, direction);
+        }
+
+        return findNextVideoIndex(items, currentIdx, direction);
+    }
+    
+    function findNextSidebarIndex(items, currentIdx, direction) {
+        if (direction === 'ArrowUp') {
+            for (let i = currentIdx - 1; i >= 0; i--) {
+                if (isSidebarItem(items[i])) return i;
+            }
+            return currentIdx;
+        } else if (direction === 'ArrowDown') {
+            for (let i = currentIdx + 1; i < items.length; i++) {
+                if (isSidebarItem(items[i])) return i;
+            }
+            return currentIdx;
+        } else if (direction === 'ArrowRight') {
+            const currentItem = items[currentIdx];
+            const currentRect = currentItem.getBoundingClientRect();
+            const currentY = currentRect.top + currentRect.height / 2;
+            
+            let closestVideoIdx = -1;
+            let minDistance = Infinity;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (!isSidebarItem(items[i])) {
+                    const vidRect = items[i].getBoundingClientRect();
+                    const vidY = vidRect.top + vidRect.height / 2;
+                    const dist = Math.abs(vidY - currentY);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestVideoIdx = i;
+                    }
+                }
+            }
+            
+            if (closestVideoIdx !== -1) {
+                return closestVideoIdx;
+            }
+            return currentIdx;
+        } else if (direction === 'ArrowLeft') {
+            return currentIdx; // Already in sidebar
+        }
+        return currentIdx;
+    }
+
+    function findNextVideoIndex(items, currentIdx, direction) {
+        if (currentIdx < 0) return 0;
 
         const { rows, itemToPos } = getGrid(items);
         const currentItem = items[currentIdx];
@@ -116,6 +179,31 @@
         let { r, c } = pos;
 
         if (direction === 'ArrowLeft') {
+            if (c === 0) {
+                // Try to go to sidebar
+                const currentRect = currentItem.getBoundingClientRect();
+                const currentY = currentRect.top + currentRect.height / 2;
+                
+                let closestSidebarIdx = -1;
+                let minDistance = Infinity;
+                
+                for (let i = 0; i < items.length; i++) {
+                    if (isSidebarItem(items[i])) {
+                        const sbRect = items[i].getBoundingClientRect();
+                        const sbY = sbRect.top + sbRect.height / 2;
+                        const dist = Math.abs(sbY - currentY);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            closestSidebarIdx = i;
+                        }
+                    }
+                }
+                
+                if (closestSidebarIdx !== -1) {
+                    return closestSidebarIdx;
+                }
+            }
+            
             c -= 1;
             if (c < 0) {
                 r -= 1;
@@ -168,12 +256,34 @@
     }
 
     function getLink(item) {
+        if (isSidebarItem(item)) {
+            if (item.tagName.toLowerCase() === 'a') return item;
+            return item.querySelector('a.yt-simple-endpoint') || item.querySelector('a#endpoint');
+        }
+
         const links = item.querySelectorAll('a[href*="watch?v="]');
         if (links.length > 0) {
             return links[0];
         }
         return item.querySelector('a#thumbnail') || item.querySelector('a.ytd-thumbnail') || item.querySelector('a.yt-simple-endpoint');
     }
+    
+    // Track search input focus
+    document.addEventListener('focusin', (e) => {
+        const target = e.target;
+        if (target && target.tagName && target.tagName.toLowerCase() === 'input' && target.id === 'search') {
+            isSearchFocused = true;
+            const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
+            focusedElements.forEach(el => el.classList.remove(FOCUS_CLASS));
+        }
+    });
+
+    document.addEventListener('focusout', (e) => {
+        const target = e.target;
+        if (target && target.tagName && target.tagName.toLowerCase() === 'input' && target.id === 'search') {
+            isSearchFocused = false;
+        }
+    });
 
     document.addEventListener('keydown', (e) => {
         // Do not interfere if user is typing in an input
