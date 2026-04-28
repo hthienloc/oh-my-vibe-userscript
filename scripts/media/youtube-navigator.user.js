@@ -2,7 +2,7 @@
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
 // @version      1.0.3
-// @description  Navigate through YouTube videos using arrow keys. Enter to play, Ctrl+Enter to open in new tab.
+// @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -186,6 +186,11 @@
             }
         }
 
+        // Bail out early if Alt is pressed to preserve system shortcuts
+        if (e.altKey) {
+            return;
+        }
+
         const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
         if (navKeys.includes(e.key)) {
             e.preventDefault();
@@ -201,13 +206,21 @@
                     const link = getLink(items[currentIndex]);
                     if (link) {
                         e.preventDefault();
-                        if (e.ctrlKey || e.metaKey) {
-                            // Open in new background tab
-                            window.open(link.href, '_blank');
-                        } else {
-                            // Open in current tab
-                            window.location.href = link.href;
-                        }
+                        // Open in current tab
+                        window.location.href = link.href;
+                    }
+                }
+            }
+        } else if (e.key === ' ' || e.key === 'Spacebar') {
+            const isWatchPage = window.location.pathname.startsWith('/watch');
+            if (currentIndex >= 0 && !isWatchPage) {
+                const items = getItems();
+                if (currentIndex < items.length) {
+                    const link = getLink(items[currentIndex]);
+                    if (link) {
+                        e.preventDefault();
+                        // Open in new tab
+                        window.open(link.href, '_blank');
                     }
                 }
             }
