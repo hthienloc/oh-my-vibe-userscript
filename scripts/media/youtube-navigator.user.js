@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.9
+// @version      1.1.0
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -20,7 +20,6 @@
     const FOCUS_CLASS = 'yt-keyboard-focused';
     let currentIndex = -1;
     let isSearchFocused = false;
-    let hoverTimeout = null;
 
     // Inject CSS for visual feedback
     const style = document.createElement('style');
@@ -80,7 +79,7 @@
         
         let rows = [];
         
-        // Attempt to group by YouTube's native rich grid rows
+        // Group by YouTube's native rich grid rows
         const richGridRows = Array.from(document.querySelectorAll('ytd-rich-grid-row'));
         if (richGridRows.length > 0) {
             for (let i = 0; i < richGridRows.length; i++) {
@@ -103,73 +102,11 @@
                     rows.push(itemsInRow);
                 }
             }
-        }
-        
-        // If no rich grid rows found (e.g. search page or list view) or some items were not captured, fallback to pixel math
-        let capturedItems = new Set();
-        for (let i = 0; i < rows.length; i++) {
-            for (let j = 0; j < rows[i].length; j++) {
-                capturedItems.add(rows[i][j]);
+        } else {
+            // Very basic fallback if not on home page (e.g., search results usually just vertical list)
+            for (let i = 0; i < videoItems.length; i++) {
+                rows.push([videoItems[i]]);
             }
-        }
-        
-        if (capturedItems.size < videoItems.length) {
-            // We need to fallback to pixel math for uncaptured items or all items if richGridRows was empty
-            const remainingItems = videoItems.filter(item => !capturedItems.has(item));
-            
-            // Sort vertically
-            remainingItems.sort((a, b) => {
-                const rectA = a.getBoundingClientRect();
-                const rectB = b.getBoundingClientRect();
-                return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
-            });
-            
-            let fallbackRows = [];
-            let currentRow = [];
-            let currentY = -1;
-            let currentHeight = 0;
-
-            for (let i = 0; i < remainingItems.length; i++) {
-                const item = remainingItems[i];
-                const rect = item.getBoundingClientRect();
-                const centerY = rect.top + rect.height / 2;
-                
-                if (currentRow.length === 0) {
-                    currentRow.push(item);
-                    currentY = centerY;
-                    currentHeight = rect.height;
-                } else {
-                    if (Math.abs(centerY - currentY) < Math.max(60, currentHeight / 3)) {
-                        currentRow.push(item);
-                    } else {
-                        fallbackRows.push(currentRow);
-                        currentRow = [item];
-                        currentY = centerY;
-                        currentHeight = rect.height;
-                    }
-                }
-            }
-            if (currentRow.length > 0) {
-                fallbackRows.push(currentRow);
-            }
-            
-            for (let i = 0; i < fallbackRows.length; i++) {
-                fallbackRows[i].sort((a, b) => {
-                    const rectA = a.getBoundingClientRect();
-                    const rectB = b.getBoundingClientRect();
-                    return rectA.left - rectB.left;
-                });
-                rows.push(fallbackRows[i]);
-            }
-            
-            // Sort all rows by vertical position to ensure correct Up/Down navigation
-            rows.sort((rowA, rowB) => {
-                if (rowA.length === 0) return 0;
-                if (rowB.length === 0) return 0;
-                const rectA = rowA[0].getBoundingClientRect();
-                const rectB = rowB[0].getBoundingClientRect();
-                return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
-            });
         }
 
         const itemToPos = new Map();
@@ -312,10 +249,6 @@
         return items.indexOf(nextItem);
     }
 
-    function getPreviewTarget(item) {
-        return item.querySelector('ytd-thumbnail') || item.querySelector('a#thumbnail');
-    }
-
     function clearAllHighlights() {
         const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
         for (let i = 0; i < focusedElements.length; i++) {
@@ -323,57 +256,7 @@
         }
     }
 
-    function cancelHover() {
-        if (hoverTimeout) {
-            clearTimeout(hoverTimeout);
-            hoverTimeout = null;
-        }
-    }
-
-    function triggerHoverLeave(item) {
-        const target = getPreviewTarget(item);
-        if (target) {
-            target.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-            target.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
-            target.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
-            target.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
-        }
-        
-        const preview = item.querySelector('ytd-video-preview');
-        if (preview) {
-            preview.active = false;
-            preview.playing = false;
-            preview.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-            preview.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
-        }
-    }
-
-    function triggerHoverEnter(item) {
-        const target = getPreviewTarget(item);
-        if (target) {
-            target.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
-            target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
-            target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-            target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-            target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-        }
-        
-        const preview = item.querySelector('ytd-video-preview');
-        if (preview) {
-            preview.active = true;
-            preview.playing = true;
-            preview.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-            preview.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-        }
-    }
-
     function updateFocus(items, newIndex) {
-        if (currentIndex >= 0 && currentIndex < items.length) {
-            const oldItem = items[currentIndex];
-            cancelHover();
-            triggerHoverLeave(oldItem);
-        }
-        
         clearAllHighlights();
         currentIndex = newIndex;
         
@@ -381,11 +264,6 @@
             const el = items[currentIndex];
             el.classList.add(FOCUS_CLASS);
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            cancelHover();
-            hoverTimeout = setTimeout(() => {
-                triggerHoverEnter(el);
-            }, 400);
         }
     }
 
@@ -407,13 +285,6 @@
         const target = e.target;
         if (target && target.tagName && target.tagName.toLowerCase() === 'input' && target.id === 'search') {
             isSearchFocused = true;
-            cancelHover();
-            if (currentIndex >= 0) {
-                const items = getItems();
-                if (currentIndex < items.length) {
-                    triggerHoverLeave(items[currentIndex]);
-                }
-            }
             clearAllHighlights();
         }
     });
@@ -479,13 +350,6 @@
 
     // Handle YouTube SPA Navigation
     document.addEventListener('yt-navigate-start', () => {
-        cancelHover();
-        if (currentIndex >= 0) {
-            const items = getItems();
-            if (currentIndex < items.length) {
-                triggerHoverLeave(items[currentIndex]);
-            }
-        }
         currentIndex = -1;
         clearAllHighlights();
     });
