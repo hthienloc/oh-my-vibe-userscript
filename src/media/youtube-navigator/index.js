@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.7
+// @version      1.0.8
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -70,28 +70,44 @@
     }
 
     function getGrid(items) {
-        const videoItems = items.filter(item => !isSidebarItem(item));
+        const videoItems = [];
+        for (let i = 0; i < items.length; i++) {
+            if (!isSidebarItem(items[i])) {
+                videoItems.push(items[i]);
+            }
+        }
         if (videoItems.length === 0) return { rows: [], itemToPos: new Map() };
         
+        // Sort items vertically to ensure correct row grouping regardless of DOM order
+        videoItems.sort((a, b) => {
+            const rectA = a.getBoundingClientRect();
+            const rectB = b.getBoundingClientRect();
+            return (rectA.top + rectA.height / 2) - (rectB.top + rectB.height / 2);
+        });
+
         let rows = [];
         let currentRow = [];
         let currentY = -1;
+        let currentHeight = 0;
 
-        for (const item of videoItems) {
+        for (let i = 0; i < videoItems.length; i++) {
+            const item = videoItems[i];
             const rect = item.getBoundingClientRect();
             const centerY = rect.top + rect.height / 2;
             
             if (currentRow.length === 0) {
                 currentRow.push(item);
                 currentY = centerY;
+                currentHeight = rect.height;
             } else {
                 // Tolerance for items in the same row
-                if (Math.abs(centerY - currentY) < 60) {
+                if (Math.abs(centerY - currentY) < Math.max(60, currentHeight / 3)) {
                     currentRow.push(item);
                 } else {
                     rows.push(currentRow);
                     currentRow = [item];
                     currentY = centerY;
+                    currentHeight = rect.height;
                 }
             }
         }
@@ -100,17 +116,18 @@
         }
 
         const itemToPos = new Map();
-        rows.forEach((row, rIdx) => {
+        for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+            const row = rows[rIdx];
             // Sort items in a row by their X coordinate to ensure correct L/R navigation
             row.sort((a, b) => {
                 const rectA = a.getBoundingClientRect();
                 const rectB = b.getBoundingClientRect();
                 return rectA.left - rectB.left;
             });
-            row.forEach((item, cIdx) => {
-                itemToPos.set(item, { r: rIdx, c: cIdx });
-            });
-        });
+            for (let cIdx = 0; cIdx < row.length; cIdx++) {
+                itemToPos.set(row[cIdx], { r: rIdx, c: cIdx });
+            }
+        }
 
         return { rows, itemToPos };
     }
@@ -260,14 +277,19 @@
         if (target) {
             target.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
             target.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+            target.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+            target.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
         }
     }
 
     function triggerHoverEnter(item) {
         const target = getPreviewTarget(item);
         if (target) {
+            target.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+            target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
             target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
             target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+            target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
         }
     }
 

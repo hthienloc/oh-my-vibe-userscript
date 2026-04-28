@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.5
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
 // @author       Vibecode
 // @match        https://*.youtube.com/*
@@ -18,6 +18,19 @@
     const BLACKOUT_DURATION_MS = 30 * 1000;
     const STORAGE_KEY_COUNT = 'void_scroll_count';
     const STORAGE_KEY_LOCK = 'void_scroll_lock_until';
+    const STORAGE_KEY_STATS_DATE = 'void_scroll_stats_date';
+    const STORAGE_KEY_STATS_COUNT = 'void_scroll_stats_count';
+    const MAX_PUNISHMENT_MS = 120 * 1000;
+    const PUNISHMENT_INCREMENT_MS = 10 * 1000;
+    
+    const SARCASTIC_MESSAGES = [
+        "Really?",
+        "Still scrolling?",
+        "The void is unimpressed.",
+        "Is it that urgent?",
+        "Patience is a virtue.",
+        "Just look at the wall for a bit."
+    ];
 
     // State
     let currentVideoId = null;
@@ -71,6 +84,13 @@
                 z-index: 1;
                 pointer-events: none;
             }
+            #void-scroll-stats {
+                position: absolute;
+                bottom: 20px;
+                font-size: 14px;
+                color: rgba(255, 255, 255, 0.5);
+                z-index: 2;
+            }
             @keyframes breathe {
                 0%, 100% { transform: scale(1); opacity: 0.2; }
                 50% { transform: scale(1.5); opacity: 0.6; }
@@ -90,6 +110,28 @@
     const getLockTime = () => parseInt(localStorage.getItem(STORAGE_KEY_LOCK) || '0', 10);
     const setLockTime = (t) => localStorage.setItem(STORAGE_KEY_LOCK, t);
 
+    const getTodayString = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    };
+
+    const getStatsCount = () => {
+        const date = localStorage.getItem(STORAGE_KEY_STATS_DATE);
+        const today = getTodayString();
+        if (date !== today) {
+            localStorage.setItem(STORAGE_KEY_STATS_DATE, today);
+            localStorage.setItem(STORAGE_KEY_STATS_COUNT, '0');
+            return 0;
+        }
+        return parseInt(localStorage.getItem(STORAGE_KEY_STATS_COUNT) || '0', 10);
+    };
+
+    const incrementStatsCount = () => {
+        const count = getStatsCount() + 1;
+        localStorage.setItem(STORAGE_KEY_STATS_COUNT, count.toString());
+        return count;
+    };
+
     const incrementCounter = () => {
         const currentCount = getCount();
         const newCount = currentCount + 1;
@@ -106,6 +148,7 @@
         if (!lockUntil) {
             lockUntil = Date.now() + BLACKOUT_DURATION_MS;
             setLockTime(lockUntil);
+            incrementStatsCount();
         }
 
         const remainingMs = lockUntil - Date.now();
@@ -127,9 +170,12 @@
         showOverlay(lockUntil);
     };
 
-    const showOverlay = (lockUntil) => {
+    const showOverlay = (initialLockUntil) => {
         addStyles();
         document.body.classList.add('void-scroll-locked');
+
+        let lockUntil = initialLockUntil;
+        const statsCount = getStatsCount();
 
         let overlay = document.getElementById('void-scroll-overlay');
         if (!overlay) {
@@ -139,11 +185,13 @@
                 <div id="void-scroll-breath"></div>
                 <div id="void-scroll-message">Time to reflect. Look at the void for a moment.</div>
                 <div id="void-scroll-timer"></div>
+                <div id="void-scroll-stats">You have faced the void ${statsCount} times today.</div>
             `;
             document.documentElement.appendChild(overlay); // Append to HTML to ensure it covers everything
         }
 
         const timerEl = document.getElementById('void-scroll-timer');
+        const messageEl = document.getElementById('void-scroll-message');
 
         const updateTimer = () => {
             const now = Date.now();
@@ -163,6 +211,20 @@
         const blockEvent = (e) => {
             e.stopPropagation();
             e.preventDefault();
+            
+            if (e.type === 'wheel' || e.type === 'touchmove') {
+                const now = Date.now();
+                const currentRemaining = lockUntil - now;
+                if (currentRemaining < MAX_PUNISHMENT_MS) {
+                    lockUntil = Math.min(now + MAX_PUNISHMENT_MS, lockUntil + PUNISHMENT_INCREMENT_MS);
+                    setLockTime(lockUntil);
+                    
+                    const randomMessage = SARCASTIC_MESSAGES[Math.floor(Math.random() * SARCASTIC_MESSAGES.length)];
+                    if (messageEl) {
+                        messageEl.textContent = randomMessage;
+                    }
+                }
+            }
         };
         window.addEventListener('keydown', blockEvent, { capture: true });
         window.addEventListener('wheel', blockEvent, { passive: false, capture: true });
