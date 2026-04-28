@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.5
+// @version      1.0.6
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
 // @author       Vibecode
 // @match        https://*.youtube.com/*
@@ -280,50 +280,106 @@
         checkYoutubeNav();
     };
 
-    // Facebook: Track Intersection of video elements
+    // Facebook: Track Intersection of video elements & src changes
     const initFacebookTracker = () => {
         const viewTimers = new Map();
+
+        const handleVideoInteraction = (target, vId) => {
+            // Cancel any previous timer for this video element if it had a different src
+            if (target._voidScrollCurrentSrc && target._voidScrollCurrentSrc !== vId) {
+                cancelVideoInteraction(target._voidScrollCurrentSrc);
+            }
+            target._voidScrollCurrentSrc = vId;
+
+            if (!trackingSet.has(vId) && !viewTimers.has(vId)) {
+                const timerId = setTimeout(() => {
+                    trackingSet.add(vId);
+                    incrementCounter();
+                    viewTimers.delete(vId);
+                }, 3000); // 3 seconds view time
+                viewTimers.set(vId, timerId);
+            }
+        };
+
+        const cancelVideoInteraction = (vId) => {
+            if (viewTimers.has(vId)) {
+                clearTimeout(viewTimers.get(vId));
+                viewTimers.delete(vId);
+            }
+        };
 
         observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const target = entry.target;
-                if (!target._voidScrollId) {
-                    target._voidScrollId = Math.random().toString(36).substr(2, 9);
-                }
-                const vId = target._voidScrollId;
+                
+                // If the element has no src, it's not a real video to track yet.
+                if (!target.src && !target.currentSrc) return;
+                
+                // Use the video source as the unique identifier to handle Facebook's element reuse
+                const vId = target.src || target.currentSrc;
+                if (!vId) return;
 
                 if (entry.isIntersecting) {
-                    if (!trackingSet.has(vId) && !viewTimers.has(vId)) {
-                        const timerId = setTimeout(() => {
-                            trackingSet.add(vId);
-                            incrementCounter();
-                            viewTimers.delete(vId);
-                        }, 3000); // 3 seconds view time
-                        viewTimers.set(vId, timerId);
-                    }
+                    handleVideoInteraction(target, vId);
                 } else {
-                    if (viewTimers.has(vId)) {
-                        clearTimeout(viewTimers.get(vId));
-                        viewTimers.delete(vId);
-                    }
+                    cancelVideoInteraction(vId);
                 }
             });
         }, { threshold: 0.5 });
 
-        const mutationObserver = new MutationObserver(() => {
-            document.querySelectorAll('video').forEach(v => {
-                if (!v._voidScrollObserved) {
-                    v._voidScrollObserved = true;
-                    observer.observe(v);
+        // Watch for 'src' changes on video elements (Facebook element reuse)
+        const srcMutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
+                    const target = mutation.target;
+                    const newSrc = target.src || target.currentSrc;
+                    
+                    if (target._voidScrollCurrentSrc && target._voidScrollCurrentSrc !== newSrc) {
+                        cancelVideoInteraction(target._voidScrollCurrentSrc);
+                    }
+
+                    if (newSrc) {
+                        // When source changes, check if it's currently visible
+                        const rect = target.getBoundingClientRect();
+                        const isVisible = rect.top < (window.innerHeight || document.documentElement.clientHeight) && rect.bottom > 0;
+                        
+                        if (isVisible) {
+                            handleVideoInteraction(target, newSrc);
+                        }
+                    }
                 }
             });
         });
 
-        mutationObserver.observe(document.body, { childList: true, subtree: true });
-        document.querySelectorAll('video').forEach(v => {
-            v._voidScrollObserved = true;
-            observer.observe(v);
+        const setupVideo = (v) => {
+            if (!v._voidScrollObserved) {
+                v._voidScrollObserved = true;
+                observer.observe(v);
+                srcMutationObserver.observe(v, { attributes: true, attributeFilter: ['src'] });
+                
+                // Also listen for play events as a fallback
+                v.addEventListener('play', () => {
+                    const srcId = v.src || v.currentSrc;
+                    if (srcId) {
+                        handleVideoInteraction(v, srcId);
+                    }
+                });
+                
+                v.addEventListener('pause', () => {
+                    const srcId = v.src || v.currentSrc;
+                    if (srcId) {
+                        cancelVideoInteraction(srcId);
+                    }
+                });
+            }
+        };
+
+        const domMutationObserver = new MutationObserver(() => {
+            document.querySelectorAll('video').forEach(setupVideo);
         });
+
+        domMutationObserver.observe(document.body, { childList: true, subtree: true });
+        document.querySelectorAll('video').forEach(setupVideo);
     };
 
 
