@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.4.32
+// @version      1.4.34
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc
 // @match        https://sv.dut.udn.vn/*
@@ -559,7 +559,7 @@ function cleanText(input) {
 async function convertImgToBase64(imgOrUrl) {
   const fetchAsBase64 = async (url) => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: "include" });
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
       const blob = await response.blob();
@@ -602,8 +602,10 @@ async function convertImgToBase64(imgOrUrl) {
       canvas.height = height;
       if (canvas.width > 0 && canvas.height > 0) {
         const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(imgOrUrl, 0, 0, width, height);
-        return canvas.toDataURL("image/jpeg", 0.8);
+        return canvas.toDataURL("image/jpeg", 0.85);
       }
     } catch (e) {
       console.warn("Canvas conversion failed, falling back to fetch:", e);
@@ -869,14 +871,14 @@ I have some incorrect answers in my quiz. Please analyze each question, explain 
             return;
           let displayAnswer = "__________";
           let userChoice = "";
-          if (isReview) {
-            const selectEl = row.querySelector("select");
-            if (selectEl) {
-              const selectedOpt = selectEl.querySelector("option[selected]");
-              if (selectedOpt && !selectedOpt.innerText.match(/Choose|Chọn/i)) {
-                userChoice = selectedOpt.innerText.trim();
-              }
+          const selectEl = row.querySelector("select");
+          if (selectEl) {
+            const selectedOpt = selectEl.querySelector("option[selected]") || selectEl.options[selectEl.selectedIndex];
+            if (selectedOpt && !selectedOpt.innerText.match(/Choose|Chọn/i)) {
+              userChoice = selectedOpt.innerText.trim();
             }
+          }
+          if (isReview) {
             const matched = answerMap.get(itemText);
             if (matched) {
               displayAnswer = `**${matched}**`;
@@ -893,8 +895,13 @@ I have some incorrect answers in my quiz. Please analyze each question, explain 
               allMatched = false;
           }
           if (userChoice && userChoice !== displayAnswer.replace(/\*\*/g, "")) {
-            contentMd += `- ${itemText} [ User Choice: ~~${userChoice}~~ | Correct: ${displayAnswer} ]
+            if (isReview) {
+              contentMd += `- ${itemText} [ User Choice: ~~${userChoice}~~ | Correct: ${displayAnswer} ]
 `;
+            } else {
+              contentMd += `- ${itemText} [ User Choice: **${userChoice}** ]
+`;
+            }
           } else {
             contentMd += `- ${itemText} [ ${displayAnswer} ]
 `;
@@ -942,15 +949,23 @@ Options: ${Array.from(allOptions).join(", ")}
             const cleanAns = ans.toLowerCase().replace(/^[a-z]\.\s+/i, "").trim();
             return cleanChoice.includes(cleanAns) || cleanAns.includes(cleanChoice);
           });
-          let prefix = `[${isCorrect ? "x" : " "}]`;
-          if (isSelected && !isCorrect) {
-            prefix = `[!]`;
-            choiceText = `~~${choiceText}~~ (My Choice)`;
-          } else if (isSelected && isCorrect) {
-            prefix = `[x]`;
-            choiceText = `**${choiceText}** (Correct)`;
-          } else if (!isSelected && isCorrect) {
-            choiceText = `**${choiceText}** (Should have chosen)`;
+          let prefix = `[ ]`;
+          if (isReview) {
+            prefix = `[${isCorrect ? "x" : " "}]`;
+            if (isSelected && !isCorrect) {
+              prefix = `[!]`;
+              choiceText = `~~${choiceText}~~ (My Choice)`;
+            } else if (isSelected && isCorrect) {
+              prefix = `[x]`;
+              choiceText = `**${choiceText}** (Correct)`;
+            } else if (!isSelected && isCorrect) {
+              choiceText = `**${choiceText}** (Should have chosen)`;
+            }
+          } else {
+            prefix = `[${isSelected ? "x" : " "}]`;
+            if (isSelected) {
+              choiceText = `**${choiceText}** (My Choice)`;
+            }
           }
           contentMd += `- ${prefix} ${choiceText}
 `;
@@ -966,8 +981,26 @@ Options: ${Array.from(allOptions).join(", ")}
           }
         }
       } else {
+        let userInputsText = "";
+        if (!isReview) {
+          const textInputs = clone.querySelectorAll('input[type="text"]');
+          if (textInputs.length > 0) {
+            userInputsText = `
+
+**My Answers:**
+`;
+            textInputs.forEach((inp, i) => {
+              if (inp.value)
+                userInputsText += `- Input ${i + 1}: **${inp.value}**
+`;
+            });
+          }
+        }
         clone.querySelectorAll(".feedback, .feedbackspan, .yui3-overlay, .icon, .grade, .state, .accesshide").forEach((el) => el.remove());
         contentMd = cleanText(sanitizeNode(clone, imgMap));
+        if (userInputsText) {
+          contentMd += userInputsText;
+        }
         const rightAnswerEl = q.querySelector(".rightanswer");
         if (isReview && rightAnswerEl) {
           contentMd += `
@@ -1255,6 +1288,70 @@ function handleLMSPages(url, savedData) {
         }
       };
       controls.appendChild(btn);
+      const downloadBtn = document.createElement("button");
+      downloadBtn.id = "summary-download-md-btn";
+      downloadBtn.innerText = "\uD83D\uDCE5 Tải file Markdown (.md)";
+      if (navBlock) {
+        downloadBtn.className = "btn btn-info mb-2 w-100";
+      } else {
+        downloadBtn.className = "btn btn-info ml-2";
+      }
+      downloadBtn.onclick = async (e) => {
+        e.preventDefault();
+        downloadBtn.disabled = true;
+        const originalText = downloadBtn.innerText;
+        downloadBtn.innerText = "⌛ Đang chuẩn bị...";
+        try {
+          if (!document.getElementById("all-questions-container")) {
+            await showAllQuestionsOnSummary();
+          }
+          const md = await extractQuiz({ includeAnswers: true, diagnose: false });
+          if (!md.trim()) {
+            alert("Không tìm thấy nội dung câu hỏi để xuất!");
+            downloadBtn.innerText = originalText;
+            downloadBtn.disabled = false;
+            return;
+          }
+          const blob = new Blob([md], { type: "text/markdown" });
+          const urlObj = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = urlObj;
+          let filename = `quiz_export_answers_${new Date().getTime()}`;
+          try {
+            const breadcrumbs = Array.from(document.querySelectorAll(".breadcrumb-item")).map((item) => item.textContent.trim());
+            if (breadcrumbs.length > 0) {
+              const quizName = breadcrumbs[breadcrumbs.length - 1];
+              const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || document.querySelector('.breadcrumb-item a[title="Khóa học"]');
+              let courseName = "";
+              if (courseLink) {
+                courseName = courseLink.textContent.trim();
+              } else if (breadcrumbs.length >= 3) {
+                courseName = breadcrumbs[2];
+              }
+              if (courseName && quizName) {
+                filename = `${courseName} ${quizName} (My Answers)`;
+              } else if (quizName) {
+                filename = `${quizName} (My Answers)`;
+              }
+            }
+            filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, "").replace(/\s+/g, "_").trim();
+          } catch (err) {}
+          a.download = `${filename}.md`;
+          a.click();
+          URL.revokeObjectURL(urlObj);
+          downloadBtn.innerText = "✅ Đã tải xong";
+          setTimeout(() => {
+            downloadBtn.innerText = originalText;
+            downloadBtn.disabled = false;
+          }, 1500);
+        } catch (err) {
+          console.error("Failed to download markdown:", err);
+          alert("Lỗi khi tải markdown: " + err);
+          downloadBtn.innerText = originalText;
+          downloadBtn.disabled = false;
+        }
+      };
+      controls.appendChild(downloadBtn);
       return true;
     };
     const injectTimer = setInterval(() => {

@@ -107,7 +107,7 @@ export function cleanText(input) {
 export async function convertImgToBase64(imgOrUrl) {
     const fetchAsBase64 = async (url) => {
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { credentials: 'include' });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const blob = await response.blob();
             return new Promise((resolve) => {
@@ -154,9 +154,12 @@ export async function convertImgToBase64(imgOrUrl) {
             
             if (canvas.width > 0 && canvas.height > 0) {
                 const ctx = canvas.getContext('2d');
+                // Fill with white background to prevent transparent PNGs from becoming black in JPEG
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(imgOrUrl, 0, 0, width, height);
                 // Use JPEG with 0.8 quality to drastically reduce base64 length
-                return canvas.toDataURL('image/jpeg', 0.8);
+                return canvas.toDataURL('image/jpeg', 0.85);
             }
         } catch (e) {
             console.warn('Canvas conversion failed, falling back to fetch:', e);

@@ -276,16 +276,16 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
                     let displayAnswer = '__________';
                     let userChoice = '';
 
-                    // Try to find what user selected in review mode
-                    if (isReview) {
-                        const selectEl = row.querySelector('select');
-                        if (selectEl) {
-                            const selectedOpt = selectEl.querySelector('option[selected]');
-                            if (selectedOpt && !selectedOpt.innerText.match(/Choose|Chọn/i)) {
-                                userChoice = selectedOpt.innerText.trim();
-                            }
+                    // Try to find what user selected
+                    const selectEl = row.querySelector('select');
+                    if (selectEl) {
+                        const selectedOpt = selectEl.querySelector('option[selected]') || selectEl.options[selectEl.selectedIndex];
+                        if (selectedOpt && !selectedOpt.innerText.match(/Choose|Chọn/i)) {
+                            userChoice = selectedOpt.innerText.trim();
                         }
+                    }
 
+                    if (isReview) {
                         const matched = answerMap.get(itemText);
                         if (matched) {
                             displayAnswer = `**${matched}**`;
@@ -302,7 +302,11 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
                     }
 
                     if (userChoice && userChoice !== displayAnswer.replace(/\*\*/g, '')) {
-                        contentMd += `- ${itemText} [ User Choice: ~~${userChoice}~~ | Correct: ${displayAnswer} ]\n`;
+                        if (isReview) {
+                            contentMd += `- ${itemText} [ User Choice: ~~${userChoice}~~ | Correct: ${displayAnswer} ]\n`;
+                        } else {
+                            contentMd += `- ${itemText} [ User Choice: **${userChoice}** ]\n`;
+                        }
                     } else {
                         contentMd += `- ${itemText} [ ${displayAnswer} ]\n`;
                     }
@@ -350,15 +354,23 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
                         return cleanChoice.includes(cleanAns) || cleanAns.includes(cleanChoice);
                     });
 
-                    let prefix = `[${isCorrect ? 'x' : ' '}]`;
-                    if (isSelected && !isCorrect) {
-                        prefix = `[!]`; // User chose wrong
-                        choiceText = `~~${choiceText}~~ (My Choice)`;
-                    } else if (isSelected && isCorrect) {
-                        prefix = `[x]`;
-                        choiceText = `**${choiceText}** (Correct)`;
-                    } else if (!isSelected && isCorrect) {
-                        choiceText = `**${choiceText}** (Should have chosen)`;
+                    let prefix = `[ ]`;
+                    if (isReview) {
+                        prefix = `[${isCorrect ? 'x' : ' '}]`;
+                        if (isSelected && !isCorrect) {
+                            prefix = `[!]`; // User chose wrong
+                            choiceText = `~~${choiceText}~~ (My Choice)`;
+                        } else if (isSelected && isCorrect) {
+                            prefix = `[x]`;
+                            choiceText = `**${choiceText}** (Correct)`;
+                        } else if (!isSelected && isCorrect) {
+                            choiceText = `**${choiceText}** (Should have chosen)`;
+                        }
+                    } else {
+                        prefix = `[${isSelected ? 'x' : ' '}]`;
+                        if (isSelected) {
+                            choiceText = `**${choiceText}** (My Choice)`;
+                        }
                     }
 
                     contentMd += `- ${prefix} ${choiceText}\n`;
@@ -373,9 +385,24 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
             }
             // Default handling
             else {
+                let userInputsText = '';
+                if (!isReview) {
+                    const textInputs = clone.querySelectorAll('input[type="text"]');
+                    if (textInputs.length > 0) {
+                        userInputsText = '\n\n**My Answers:**\n';
+                        textInputs.forEach((inp, i) => {
+                            if (inp.value) userInputsText += `- Input ${i + 1}: **${inp.value}**\n`;
+                        });
+                    }
+                }
+
                 clone.querySelectorAll('.feedback, .feedbackspan, .yui3-overlay, .icon, .grade, .state, .accesshide').forEach(el => el.remove());
                 contentMd = cleanText(sanitizeNode(clone, imgMap));
                 
+                if (userInputsText) {
+                    contentMd += userInputsText;
+                }
+
                 const rightAnswerEl = q.querySelector('.rightanswer');
                 if (isReview && rightAnswerEl) {
                     contentMd += `\n\n> Correct Answer: **${cleanText(sanitizeNode(rightAnswerEl, imgMap))}**\n`;
@@ -692,6 +719,70 @@ export function handleLMSPages(url, savedData) {
                 }
             };
             controls.appendChild(btn);
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.id = 'summary-download-md-btn';
+            downloadBtn.innerText = '📥 Tải file Markdown (.md)';
+            if (navBlock) {
+                downloadBtn.className = 'btn btn-info mb-2 w-100';
+            } else {
+                downloadBtn.className = 'btn btn-info ml-2';
+            }
+            downloadBtn.onclick = async (e) => {
+                e.preventDefault();
+                downloadBtn.disabled = true;
+                const originalText = downloadBtn.innerText;
+                downloadBtn.innerText = '⌛ Đang chuẩn bị...';
+                try {
+                    if (!document.getElementById('all-questions-container')) {
+                        await showAllQuestionsOnSummary();
+                    }
+                    const md = await extractQuiz({ includeAnswers: true, diagnose: false });
+                    if (!md.trim()) {
+                        alert('Không tìm thấy nội dung câu hỏi để xuất!');
+                        downloadBtn.innerText = originalText;
+                        downloadBtn.disabled = false;
+                        return;
+                    }
+                    const blob = new Blob([md], { type: 'text/markdown' });
+                    const urlObj = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = urlObj;
+                    let filename = `quiz_export_answers_${new Date().getTime()}`;
+                    try {
+                        const breadcrumbs = Array.from(document.querySelectorAll('.breadcrumb-item')).map(item => item.textContent.trim());
+                        if (breadcrumbs.length > 0) {
+                            const quizName = breadcrumbs[breadcrumbs.length - 1];
+                            const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || 
+                                               document.querySelector('.breadcrumb-item a[title="Khóa học"]');
+                            let courseName = '';
+                            if (courseLink) {
+                                courseName = courseLink.textContent.trim();
+                            } else if (breadcrumbs.length >= 3) {
+                                courseName = breadcrumbs[2];
+                            }
+                            if (courseName && quizName) {
+                                filename = `${courseName} ${quizName} (My Answers)`;
+                            } else if (quizName) {
+                                filename = `${quizName} (My Answers)`;
+                            }
+                        }
+                        filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, '').replace(/\s+/g, '_').trim();
+                    } catch (err) { }
+                    a.download = `${filename}.md`;
+                    a.click();
+                    URL.revokeObjectURL(urlObj);
+                    downloadBtn.innerText = '✅ Đã tải xong';
+                    setTimeout(() => { downloadBtn.innerText = originalText; downloadBtn.disabled = false; }, 1500);
+                } catch (err) {
+                    console.error('Failed to download markdown:', err);
+                    alert('Lỗi khi tải markdown: ' + err);
+                    downloadBtn.innerText = originalText;
+                    downloadBtn.disabled = false;
+                }
+            };
+            controls.appendChild(downloadBtn);
+
             return true;
         };
 
