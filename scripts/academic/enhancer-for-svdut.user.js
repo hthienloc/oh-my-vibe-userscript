@@ -16,6 +16,7 @@
 // @license      MIT
 // @downloadURL  https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/academic/enhancer-for-svdut.user.js
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/academic/enhancer-for-svdut.user.js
+// @icon         https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/icons/enhancer-for-svdut.svg
 // ==/UserScript==
 
 (function() {

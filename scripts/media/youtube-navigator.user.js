@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.1.1
+// @version      1.1.2
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -9,6 +9,7 @@
 // @run-at       document-idle
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/media/youtube-navigator.user.js
 // @downloadURL  https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/media/youtube-navigator.user.js
+// @icon         https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/icons/youtube-navigator.svg
 // ==/UserScript==
 
 (function() {

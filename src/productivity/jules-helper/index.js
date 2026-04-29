@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Jules Session & Message Copier (V3.4 Manual Refresh)
 // @namespace    http://tampermonkey.net/
-// @version      3.4.2
+// @version      3.4.3
 // @description  Full bi-directional bridge with Manual Refresh button and robust state management.
 // @author       hthienloc
 // @match        https://jules.google.com/session/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=google.com
+// @icon         https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/icons/jules-helper.svg
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js

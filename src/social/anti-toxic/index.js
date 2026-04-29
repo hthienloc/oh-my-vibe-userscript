@@ -1,7 +1,15 @@
-/**
- * Facebook Anti-Toxic & Spoiler Filter
- * Monitors the newsfeed and hides posts containing blacklisted keywords.
- */
+// ==UserScript==
+// @name         Facebook Anti-Toxic & Spoiler Filter
+// @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
+// @version      1.0.1
+// @description  Monitors the newsfeed and hides posts containing blacklisted keywords.
+// @author       hthienloc
+// @match        https://www.facebook.com/*
+// @icon         https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/assets/icons/anti-toxic.svg
+// @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/social/anti-toxic.user.js
+// @downloadURL  https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/social/anti-toxic.user.js
+// @grant        none
+// ==/UserScript==
 
 (function() {
     'use strict';
