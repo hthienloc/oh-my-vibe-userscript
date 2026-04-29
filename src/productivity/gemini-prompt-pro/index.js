@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Gemini Prompt Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
+// @version      1.0.5
 // @description  A Categorized Quick-Prompt Userscript for Google Gemini
+// @author       hthienloc
 // @match        https://gemini.google.com/app*
 // @grant        none
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/gemini-prompt-pro.user.js
@@ -15,19 +16,28 @@
     const prompts = {
         "ELI5": "Explain this concept to me as if I am 5 years old, using very simple language and relatable everyday examples.",
         "Analogy": "Provide a creative and accurate analogy to help me understand this topic better.",
-        "Deep Dive": "Provide a comprehensive deep dive into this topic, covering its history, core mechanisms, advanced implications, and current state-of-the-art developments.",
+        "Concept Map": "Create a concept map or outline breaking down this topic into its core components and their relationships.",
+        "Visualizer": "Describe how I can visualize this concept or data, or generate a descriptive prompt for an image generator.",
         "Refactor": "Please refactor the following code to improve its readability, maintainability, and performance. Follow clean code principles and best practices for the language.",
-        "Document": "Generate comprehensive documentation for the following code, including inline comments explaining complex logic, and a high-level overview of its purpose and inputs/outputs.",
         "Debug": "Analyze the following code or error message to identify the root cause of the bug. Explain the problem and provide a corrected version of the code.",
-        "Critique": "Critique my idea, argument, or plan. Point out potential flaws, edge cases I might have missed, and suggest concrete ways to strengthen it.",
+        "Document": "Generate comprehensive documentation for the following code, including inline comments explaining complex logic, and a high-level overview of its purpose and inputs/outputs.",
+        "Test Cases": "Write comprehensive test cases for the following code, covering typical use cases, edge cases, and potential error conditions.",
+        "Explain Code": "Explain the following code step by step, describing what each section does and how it contributes to the overall functionality.",
         "Summarize": "Summarize the key points of the text or conversation above into a concise, easily digestible format, highlighting only the most crucial information.",
-        "Simplify": "Simplify this text or explanation. Remove jargon, shorten convoluted sentences, and make the overall message much clearer and more direct."
+        "Professional Tone": "Rewrite the following text to sound more professional, polite, and suitable for a formal business environment.",
+        "Proofread": "Proofread the following text for grammar, spelling, and punctuation errors. Suggest improvements for flow and clarity.",
+        "Simplify": "Simplify this text or explanation. Remove jargon, shorten convoluted sentences, and make the overall message much clearer and more direct.",
+        "Critique": "Critique my idea, argument, or plan. Point out potential flaws, edge cases I might have missed, and suggest concrete ways to strengthen it.",
+        "First Principles": "Break down this complex problem into its fundamental truths (first principles), and reason up from there.",
+        "Pros & Cons": "List the pros and cons of this idea or decision, providing a balanced and objective analysis.",
+        "Step-by-Step": "Provide a detailed, step-by-step guide or logical sequence to accomplish this task or solve this problem."
     };
 
     const categories = [
-        { name: "Understand", chips: ["ELI5", "Analogy", "Deep Dive"] },
-        { name: "Dev", chips: ["Refactor", "Document", "Debug"] },
-        { name: "Strategic", chips: ["Critique", "Summarize", "Simplify"] }
+        { name: "Knowledge", chips: ["ELI5", "Analogy", "Concept Map", "Visualizer"] },
+        { name: "Coding", chips: ["Refactor", "Debug", "Document", "Test Cases", "Explain Code"] },
+        { name: "Writing", chips: ["Summarize", "Professional Tone", "Proofread", "Simplify"] },
+        { name: "Logic", chips: ["Critique", "First Principles", "Pros & Cons", "Step-by-Step"] }
     ];
 
     const CONTAINER_ID = 'vibecode-gemini-prompts-container';
@@ -49,6 +59,28 @@
                 box-sizing: border-box;
                 align-items: center;
                 background: transparent;
+            }
+            .vibecode-clear-btn {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: transparent;
+                border: 1px solid #e1e1e1;
+                border-radius: 50%;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                z-index: 10;
+                font-size: 16px;
+                color: #5f6368;
+            }
+            .vibecode-clear-btn:hover {
+                background: #f0f0f2;
+                border-color: #d1d1d1;
             }
             .vibecode-category-wrapper {
                 position: relative;
@@ -126,6 +158,14 @@
                 background: #f0f0f2;
             }
             @media (prefers-color-scheme: dark) {
+                .vibecode-clear-btn {
+                    border-color: #333333;
+                    color: #e8eaed;
+                }
+                .vibecode-clear-btn:hover {
+                    background: #2c2c2e;
+                    border-color: #444444;
+                }
                 .vibecode-category-chip {
                     background: #1c1c1e;
                     border-color: #333333;
@@ -192,6 +232,39 @@
         return container;
     }
 
+    function clearEditor() {
+        const editor = document.querySelector('.ql-editor') || document.querySelector('rich-textarea') || document.querySelector('.ProseMirror') || document.querySelector('p[data-placeholder]') || document.querySelector('div[contenteditable="true"]');
+        
+        if (!editor) {
+             console.warn('Gemini Prompt Pro: Could not find editor element to clear.');
+             return;
+        }
+
+        editor.focus();
+
+        if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {
+            editor.value = '';
+        } else {
+             editor.textContent = '';
+        }
+        
+        const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+        editor.dispatchEvent(inputEvent);
+    }
+
+    function createClearButton() {
+        const btn = document.createElement('button');
+        btn.className = 'vibecode-clear-btn';
+        btn.innerHTML = '🗑️';
+        btn.title = 'Clear Editor';
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            clearEditor();
+        });
+        return btn;
+    }
+
     function insertPrompt(text) {
         const editor = document.querySelector('.ql-editor') || document.querySelector('rich-textarea') || document.querySelector('.ProseMirror') || document.querySelector('p[data-placeholder]') || document.querySelector('div[contenteditable="true"]');
         
@@ -234,6 +307,13 @@
         const chipsContainer = createChips();
         
         inputContainer.parentElement.insertBefore(chipsContainer, inputContainer);
+
+        // Inject clear button
+        if (!inputContainer.querySelector('.vibecode-clear-btn')) {
+            const clearBtn = createClearButton();
+            inputContainer.style.position = 'relative';
+            inputContainer.appendChild(clearBtn);
+        }
     }
 
     const observer = new MutationObserver(function(mutations) {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Keyboard Navigator
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.1.0
+// @version      1.1.1
 // @description  Navigate through YouTube videos using arrow keys. Enter to play, Space to open in new tab.
 // @author       hthienloc
 // @match        https://www.youtube.com/*
@@ -17,25 +17,13 @@
     const VIDEO_SELECTORS = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer';
     const SIDEBAR_SELECTORS = 'ytd-guide-entry-renderer, #endpoint.yt-guide-entry-renderer';
     const SELECTORS = `${VIDEO_SELECTORS}, ${SIDEBAR_SELECTORS}`;
-    const FOCUS_CLASS = 'yt-keyboard-focused';
+    const FOCUS_CLASS = 'vibecode-yt-keyboard-focused';
     let currentIndex = -1;
     let isSearchFocused = false;
 
-    // Inject CSS for visual feedback
-    const style = document.createElement('style');
-    style.textContent = `
-        .${FOCUS_CLASS} {
-            outline: 4px solid rgba(255, 105, 180, 0.7) !important; /* Hot Pink */
-            outline-offset: 8px !important; /* Move border outside */
-            border-radius: 8px !important;
-            box-shadow: 0 0 15px rgba(255,105,180,0.6) !important;
-            transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out !important;
-            z-index: 100 !important;
-            position: relative !important;
-        }
-    `;
-    document.head.appendChild(style);
-
+    /**
+     * Initializes auto-selection of the first video when the page loads
+     */
     function initAutoSelect() {
         if (isSearchFocused) return;
         const items = getItems();
@@ -45,18 +33,19 @@
         }
     }
 
+    /**
+     * Checks if the given item is a sidebar element.
+     * @param {Element} item
+     * @returns {boolean}
+     */
     function isSidebarItem(item) {
         return item.matches(SIDEBAR_SELECTORS);
     }
 
-    // Run on initial load
-    setTimeout(initAutoSelect, 2000); // Wait for YT to load content
-    
-    // Check periodically if content changes
-    setInterval(() => {
-        if (currentIndex === -1) initAutoSelect();
-    }, 3000);
-
+    /**
+     * Retrieves all navigable items currently visible in the DOM.
+     * @returns {Element[]}
+     */
     function getItems() {
         const items = Array.from(document.querySelectorAll(SELECTORS));
         // Filter out hidden items
@@ -68,6 +57,39 @@
         });
     }
 
+    /**
+     * Initializes the script and applies global styles.
+     */
+    function init() {
+        // Inject CSS for visual feedback
+        const style = document.createElement('style');
+        style.textContent = `
+        .${FOCUS_CLASS} {
+            outline: 4px solid rgba(255, 105, 180, 0.7) !important; /* Hot Pink */
+            outline-offset: 8px !important; /* Move border outside */
+            border-radius: 8px !important;
+            box-shadow: 0 0 15px rgba(255,105,180,0.6) !important;
+            transition: outline 0.1s ease-in-out, box-shadow 0.1s ease-in-out !important;
+            z-index: 100 !important;
+            position: relative !important;
+        }
+    `;
+        document.head.appendChild(style);
+
+        // Run on initial load
+        setTimeout(initAutoSelect, 2000); // Wait for YT to load content
+        
+        // Check periodically if content changes
+        setInterval(() => {
+            if (currentIndex === -1) initAutoSelect();
+        }, 3000);
+    }
+
+    /**
+     * Groups grid items into a 2D array representation based on physical DOM layout.
+     * @param {Element[]} items
+     * @returns {{rows: Element[][], itemToPos: Map<Element, {r: number, c: number}>}}
+     */
     function getGrid(items) {
         const videoItems = [];
         for (let i = 0; i < items.length; i++) {
@@ -120,6 +142,13 @@
         return { rows, itemToPos };
     }
 
+    /**
+     * Determines the index of the next item to focus based on navigation direction.
+     * @param {Element[]} items
+     * @param {number} currentIdx
+     * @param {string} direction
+     * @returns {number}
+     */
     function findNextIndex(items, currentIdx, direction) {
         if (currentIdx < 0) return 0;
         
@@ -132,6 +161,13 @@
         return findNextVideoIndex(items, currentIdx, direction);
     }
     
+    /**
+     * Finds the next item in the sidebar list.
+     * @param {Element[]} items
+     * @param {number} currentIdx
+     * @param {string} direction
+     * @returns {number}
+     */
     function findNextSidebarIndex(items, currentIdx, direction) {
         if (direction === 'ArrowUp') {
             for (let i = currentIdx - 1; i >= 0; i--) {
@@ -173,6 +209,13 @@
         return currentIdx;
     }
 
+    /**
+     * Finds the next item within the main video grid.
+     * @param {Element[]} items
+     * @param {number} currentIdx
+     * @param {string} direction
+     * @returns {number}
+     */
     function findNextVideoIndex(items, currentIdx, direction) {
         if (currentIdx < 0) return 0;
 
@@ -249,6 +292,9 @@
         return items.indexOf(nextItem);
     }
 
+    /**
+     * Removes the focus class from all elements.
+     */
     function clearAllHighlights() {
         const focusedElements = document.querySelectorAll(`.${FOCUS_CLASS}`);
         for (let i = 0; i < focusedElements.length; i++) {
@@ -256,6 +302,11 @@
         }
     }
 
+    /**
+     * Applies focus visually to a new item.
+     * @param {Element[]} items
+     * @param {number} newIndex
+     */
     function updateFocus(items, newIndex) {
         clearAllHighlights();
         currentIndex = newIndex;
@@ -267,6 +318,11 @@
         }
     }
 
+    /**
+     * Gets the primary hyperlink from the focused item.
+     * @param {Element} item
+     * @returns {HTMLAnchorElement|null}
+     */
     function getLink(item) {
         if (isSidebarItem(item)) {
             if (item.tagName.toLowerCase() === 'a') return item;
@@ -354,4 +410,9 @@
         clearAllHighlights();
     });
 
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

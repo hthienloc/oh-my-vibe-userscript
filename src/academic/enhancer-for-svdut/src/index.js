@@ -23,6 +23,10 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+/**
+ * Main initialization function.
+ * Routes execution based on the current domain/URL.
+ */
 function init() {
     const url = window.location.href;
     

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SoundCloud Downloader
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.3.4
+// @version      1.3.5
 // @description  Download SoundCloud tracks with embedded ID3 metadata (title, artist, album, cover art) locally.
 // @author       hthienloc (based on maple3142)
 // @match        https://soundcloud.com/*
@@ -15,6 +15,14 @@
 
 /* jshint esversion: 8 */
 
+/**
+ * Intercepts method calls on an object.
+ * @param {Object} obj The object containing the method.
+ * @param {string} name The method name to hook.
+ * @param {Function} callback The hook callback.
+ * @param {string} type Hook execution timing: 'before' or 'after'.
+ * @returns {Function} Function to remove the hook.
+ */
 function hook(obj, name, callback, type) {
     const fn = obj[name];
     if (typeof fn !== "function") return () => {};
@@ -29,6 +37,11 @@ function hook(obj, name, callback, type) {
     };
 }
 
+/**
+ * Triggers a file download given a URL and filename.
+ * @param {string} url Data URL or object URL.
+ * @param {string} name Desired filename.
+ */
 function triggerDownload(url, name) {
     const a = document.createElement("a");
     document.body.appendChild(a);
@@ -96,8 +109,10 @@ const btn = {
     }
 };
 
-btn.init();
-
+/**
+ * Hooks network requests to discover SoundCloud's Client ID.
+ * @returns {Promise<string>}
+ */
 function getClientId() {
     return new Promise((resolve) => {
         let resolved = false;
@@ -150,7 +165,11 @@ function getClientId() {
 const clientIdPromise = getClientId();
 let controller = null;
 
-// helper: try to build best artwork url
+/**
+ * Finds the highest quality artwork URL for a track.
+ * @param {Object} track
+ * @returns {string|null}
+ */
 function artworkBestUrl(track) {
     let art = track.artwork_url || (track.user && track.user.avatar_url) || null;
     if (
@@ -165,6 +184,13 @@ function artworkBestUrl(track) {
     return art.replace("-large", "-t1080x1080").replace("-crop", "-t1080x1080");
 }
 
+/**
+ * Fetches data as ArrayBuffer with optional progress callback.
+ * @param {string} url
+ * @param {AbortSignal} [signal]
+ * @param {Function} [onProgress]
+ * @returns {Promise<ArrayBuffer>}
+ */
 async function fetchArrayBuffer(url, signal, onProgress) {
     const resp = await fetch(url, { signal });
     if (!resp.ok) throw new Error("Fetch failed: " + resp.status);
@@ -196,6 +222,12 @@ async function fetchArrayBuffer(url, signal, onProgress) {
     return allChunks.buffer;
 }
 
+/**
+ * Downloads a single track and applies ID3 tags.
+ * @param {Object} track
+ * @param {string} clientId
+ * @param {Function} onProgress
+ */
 async function downloadTrack(track, clientId, onProgress) {
     try {
         const progressive =
@@ -266,11 +298,10 @@ async function downloadTrack(track, clientId, onProgress) {
     }
 }
 
-async function downloadAlbum(album, clientId) {
-    const tracks = album.tracks || album.collection || [];
-    console.log(`Downloading album with ${tracks.length} tracks...`);
-}
-
+/**
+ * Triggers loading logic based on current SoundCloud URL.
+ * @param {string} by Context identifier (e.g., 'init', 'pushState')
+ */
 async function load(by) {
     btn.detach();
     if (
@@ -317,6 +348,18 @@ async function load(by) {
     }
 }
 
-load("init");
-hook(history, "pushState", () => load("pushState"), "after");
-window.addEventListener("popstate", () => load("popstate"));
+/**
+ * Initializes listeners and UI components.
+ */
+function init() {
+    btn.init();
+    load("init");
+    hook(history, "pushState", () => load("pushState"), "after");
+    window.addEventListener("popstate", () => load("popstate"));
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+} else {
+    init();
+}

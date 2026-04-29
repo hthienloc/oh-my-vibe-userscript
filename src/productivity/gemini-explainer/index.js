@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Explainer (Everywhere)
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
+// @version      1.0.3
 // @description  Highlight text to quickly ask Google Gemini to explain it.
 // @author       hthienloc
 // @match        *://*/*
@@ -15,9 +15,13 @@
 
     const ICON_ID = 'vibecode-gemini-explainer-icon';
     
-    // SVG for Gemini icon (Sparkle)
     const SVG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M10.268 21.432c-1.129 2.115-4.148 2.115-5.277 0L2.247 16.29A4.1 4.1 0 0 1 .5 13.5v0c0-2.213 1.724-4.045 3.931-4.17l5.441-.307c2.148-.121 3.864 1.547 3.932 3.69l.307 5.44a4.1 4.1 0 0 1-3.843 4.279v0zm0 0c.264-1.393 1.341-2.47 2.734-2.734a4.1 4.1 0 0 1 4.542 2.378l1.397 3.32a2.05 2.05 0 0 1-3.793 1.597l-1.397-3.32c-.771-1.83-2.924-2.274-4.307-1.126zM22.058 8.163c-.87 1.631-3.197 1.631-4.067 0L15.35 3.197a3.16 3.16 0 0 1-1.347-2.15v0c0-1.706 1.33-3.118 3.031-3.214l4.195-.237c1.656-.093 2.979 1.193 3.032 2.845l.237 4.195a3.16 3.16 0 0 1-2.964 3.3v0z"/></svg>`;
 
+    /**
+     * Creates and injects the Gemini action icon into the DOM if it doesn't exist.
+     * Applies styling for both light and dark themes.
+     * @returns {HTMLElement} The icon element.
+     */
     function createIcon() {
         let icon = document.getElementById(ICON_ID);
         if (!icon) {
@@ -75,6 +79,11 @@
 
     let currentSelectedText = '';
 
+    /**
+     * Handles clicking on the injected Gemini icon.
+     * Opens a new tab with the selected text passed as a prompt.
+     * @param {Event} e 
+     */
     function handleIconClick(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -86,6 +95,9 @@
         }
     }
 
+    /**
+     * Hides the Gemini icon and clears the stored selected text.
+     */
     function hideIcon() {
         const icon = document.getElementById(ICON_ID);
         if (icon) {
@@ -94,6 +106,11 @@
         currentSelectedText = '';
     }
 
+    /**
+     * Handles text selection across the document.
+     * Determines if the icon should be shown or hidden based on selection.
+     * @param {Event} e 
+     */
     function handleSelection(e) {
         // Don't trigger if clicking on the icon itself
         if (e.target && e.target.closest && e.target.closest('#' + ICON_ID)) {
@@ -116,6 +133,10 @@
         }, 10);
     }
 
+    /**
+     * Positions and displays the Gemini icon relative to the selected text.
+     * @param {DOMRect} rect Bounding rectangle of the current text selection.
+     */
     function showIcon(rect) {
         const icon = createIcon();
         
@@ -129,6 +150,16 @@
         icon.style.display = 'flex';
     }
 
-    // Monitor global mouseup
-    document.addEventListener('mouseup', handleSelection);
+    /**
+     * Initializes the script by attaching global event listeners.
+     */
+    function init() {
+        document.addEventListener('mouseup', handleSelection);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

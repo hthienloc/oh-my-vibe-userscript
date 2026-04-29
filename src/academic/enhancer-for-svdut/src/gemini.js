@@ -1,7 +1,7 @@
 /**
- * Logic for automatically copying Gemini's answer to clipboard
+ * Logic for automatically copying Gemini's answer to clipboard.
+ * Specifically handles JSON answer structures from the LMS script.
  */
-
 export function handleGeminiPages() {
     console.log('[Enhancer] Gemini auto-copy enabled.');
 
@@ -52,6 +52,9 @@ export function handleGeminiPages() {
     });
 }
 
+/**
+ * Displays a temporary toast notification indicating successful copy.
+ */
 function showCopyToast() {
     let toast = document.getElementById('svdut-copy-toast');
     if (!toast) {

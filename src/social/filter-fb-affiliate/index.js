@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Affiliate Comment Filter
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.1.1.1
+// @version      1.0.1.1.1.1
 // @description  Automatically hide comments containing affiliate links or promotional keywords on Facebook.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -71,14 +71,14 @@
      * @param {HTMLElement} commentNode
      */
     function processComment(commentNode) {
-        if (commentNode.dataset.affiliateFiltered) return; // Already processed
+        if (commentNode.dataset.vibecodeAffiliateFiltered) return; // Already processed
 
         if (isSpam(commentNode)) {
             commentNode.style.display = 'none';
             console.log('[FB Filter] Hidden an affiliate/spam comment.');
         }
 
-        commentNode.dataset.affiliateFiltered = 'true';
+        commentNode.dataset.vibecodeAffiliateFiltered = 'true';
     }
 
     /**
@@ -90,28 +90,39 @@
         comments.forEach(processComment);
     }
 
-    // Use MutationObserver to handle dynamically loaded comments
-    const observer = new MutationObserver((mutations) => {
-        let shouldScan = false;
-        for (const mutation of mutations) {
-            if (mutation.addedNodes.length > 0) {
-                shouldScan = true;
-                break;
+    /**
+     * Initializes the script by setting up a mutation observer for dynamically loaded comments.
+     */
+    function init() {
+        // Use MutationObserver to handle dynamically loaded comments
+        const observer = new MutationObserver((mutations) => {
+            let shouldScan = false;
+            for (const mutation of mutations) {
+                if (mutation.addedNodes.length > 0) {
+                    shouldScan = true;
+                    break;
+                }
             }
-        }
-        if (shouldScan) {
-            scanComments();
-        }
-    });
+            if (shouldScan) {
+                scanComments();
+            }
+        });
 
-    // Start observing the body for changes
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+        // Start observing the body for changes
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
 
-    // Initial scan
-    scanComments();
+        // Initial scan
+        scanComments();
 
-    console.log('[FB Filter] Userscript loaded and watching for spam comments...');
+        console.log('[FB Filter] Userscript loaded and watching for spam comments...');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

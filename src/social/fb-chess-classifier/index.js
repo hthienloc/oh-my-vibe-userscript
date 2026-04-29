@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Chess Move Classifier
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.18
+// @version      1.0.19
 // @description  Classifies Facebook messages and comments using Chess.com move evaluation icons based on vocabulary.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -35,6 +35,11 @@
     // Global cache for base64 icons to prevent redundant network requests
     const imageCache = {};
 
+    /**
+     * Evaluates text to determine its "chess move" classification.
+     * @param {string} text The message text to evaluate.
+     * @returns {Object|null} The classification object or null if undetermined.
+     */
     function getClassification(text) {
         let score = 0;
         const lowerText = text.toLowerCase();
@@ -139,6 +144,12 @@
         return result;
     }
 
+    /**
+     * Applies a pure CSS fallback badge when the image fails to load.
+     * @param {HTMLElement} badge The badge container element.
+     * @param {HTMLImageElement} img The image element (to be hidden).
+     * @param {Object} cls The classification object.
+     */
     function applyFallbackBadge(badge, img, cls) {
         img.style.display = 'none';
         badge.textContent = cls.label;
@@ -158,9 +169,14 @@
         });
     }
 
+    /**
+     * Creates the badge element for a given classification.
+     * @param {Object} cls The classification object.
+     * @returns {HTMLElement} The created badge element.
+     */
     function createBadge(cls) {
         const badge = document.createElement('span');
-        badge.className = 'chess-badge-container';
+        badge.className = 'vibecode-chess-badge-container';
         badge.title = cls.title;
         Object.assign(badge.style, {
             display: 'inline-flex',
@@ -215,8 +231,12 @@
         return badge;
     }
 
+    /**
+     * Processes a single DOM element, evaluating its text and applying a badge if applicable.
+     * @param {HTMLElement} el The element to process.
+     */
     function processElement(el) {
-        if (el.dataset.chessEvaluated) return;
+        if (el.dataset.vibecodeChessEvaluated) return;
         
         if (el.classList.contains('xi81zsa') || el.closest('.xi81zsa')) return;
 
@@ -268,13 +288,16 @@
 
         const cls = getClassification(text);
         if (cls) {
-            el.dataset.chessEvaluated = 'true';
+            el.dataset.vibecodeChessEvaluated = 'true';
             const badge = createBadge(cls);
             
             el.appendChild(badge);
         }
     }
 
+    /**
+     * Scans the document for processable text containers.
+     */
     function scan() {
         const selectors = [
             'div[dir="auto"]:not([role="textbox"])',
@@ -286,15 +309,26 @@
         document.querySelectorAll(selectors.join(',')).forEach(processElement);
     }
 
-    let timer = null;
-    const observer = new MutationObserver((mutations) => {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(scan, 100); 
-    });
+    /**
+     * Initializes the script by setting up a debounced mutation observer.
+     */
+    function init() {
+        let timer = null;
+        const observer = new MutationObserver((mutations) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(scan, 100); 
+        });
 
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // Initial delay to let FB dynamic UI settle
-    setTimeout(scan, 2000);
-    console.log('%c[Chess Move Classifier V1.0.12] Pro Edition Loaded!', 'color: #81b64c; font-weight: bold;');
+        observer.observe(document.body, { childList: true, subtree: true });
+        
+        // Initial delay to let FB dynamic UI settle
+        setTimeout(scan, 2000);
+        console.log('%c[Chess Move Classifier V1.0.18] Pro Edition Loaded!', 'color: #81b64c; font-weight: bold;');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

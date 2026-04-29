@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jules Session & Message Copier (V3.4 Manual Refresh)
 // @namespace    http://tampermonkey.net/
-// @version      3.4.1
+// @version      3.4.2
 // @description  Full bi-directional bridge with Manual Refresh button and robust state management.
 // @author       hthienloc
 // @match        https://jules.google.com/session/*
@@ -29,6 +29,7 @@
     
     /**
      * Extracts the core Session ID from the URL using Regex.
+     * @returns {string|null} The session ID if found, otherwise null.
      */
     function extractSessionID() {
         const match = window.location.href.match(/\/session\/([^\/]+)/);
@@ -40,6 +41,11 @@
 
     console.log(`%c[Lotus Bridge V3.4] Manual Refresh Active for: ${SESSION_ID}`, 'color: #3d5afe; font-weight: bold;');
 
+    /**
+     * Creates a short fingerprint to uniquely identify a message and prevent duplicates.
+     * @param {string} msg The message string.
+     * @returns {string} The base64 fingerprint or truncated string.
+     */
     function getMessageFingerprint(msg) {
         try {
             return btoa(unescape(encodeURIComponent(msg))).slice(0, 32);
@@ -48,12 +54,16 @@
         }
     }
 
+    /**
+     * Retrieves the chat input element.
+     * @returns {HTMLElement|null}
+     */
     function getChatInput() {
         return document.querySelector('textarea') || document.querySelector('[contenteditable="true"]');
     }
 
     /**
-     * Polling mechanism with Cache Buster
+     * Polling mechanism with Cache Buster. Polls the local server for proposed responses.
      */
     function poll() {
         if (!SESSION_ID) return;
@@ -70,7 +80,7 @@
                         if (handledMessages.size > 0) {
                             handledMessages.clear();
                         }
-                        const existing = document.getElementById('gemini-safe-panel');
+                        const existing = document.getElementById('vibecode-gemini-safe-panel');
                         if (existing) existing.remove();
                         return;
                     }
@@ -86,11 +96,16 @@
         });
     }
 
+    /**
+     * Injects the UI panel presenting Gemini's proposed reply.
+     * @param {string} message The proposed message from Gemini.
+     * @param {string} fingerprint The unique fingerprint for the message.
+     */
     function injectProposalUI(message, fingerprint) {
-        if (document.getElementById('gemini-safe-panel')) return;
+        if (document.getElementById('vibecode-gemini-safe-panel')) return;
 
         const panel = document.createElement('div');
-        panel.id = 'gemini-safe-panel';
+        panel.id = 'vibecode-gemini-safe-panel';
         Object.assign(panel.style, {
             position: 'fixed', bottom: '120px', left: '50%', transform: 'translateX(-50%)',
             width: '450px', padding: '20px', background: '#ffffff', border: '4px solid #3d5afe',
@@ -157,6 +172,9 @@
         document.body.appendChild(panel);
     }
 
+    /**
+     * Sends a request to clear the server's outbox.
+     */
     function clearOutboxOnServer() {
         GM_xmlhttpRequest({
             method: "POST",
@@ -167,6 +185,8 @@
 
     /**
      * Injects QUICK REPLIES, SYNC, and MANUAL REFRESH buttons.
+     * @param {HTMLElement} container The container to inject buttons into.
+     * @param {Function} textGetter Function to extract text from the container.
      */
     function injectActionButtons(container, textGetter) {
         if (container.getAttribute('data-gemini-injected') === 'true') return;
@@ -257,6 +277,9 @@
         container.setAttribute('data-gemini-injected', 'true');
     }
 
+    /**
+     * Scans for new chat bubbles and injects action buttons if needed.
+     */
     function scanMessages() {
         document.querySelectorAll('swebot-agent-chat-bubble .message-container').forEach(container => {
             const content = container.querySelector('swebot-markdown-viewer') || container;
@@ -264,6 +287,17 @@
         });
     }
 
-    setInterval(scanMessages, 1000);
-    setInterval(poll, 3000);
+    /**
+     * Initializes intervals for scanning messages and polling.
+     */
+    function init() {
+        setInterval(scanMessages, 1000);
+        setInterval(poll, 3000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

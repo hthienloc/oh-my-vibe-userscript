@@ -1,3 +1,7 @@
+/**
+ * Main handler for Feedback portal specific features.
+ * @param {string} url The current page URL.
+ */
 export function handleFeedbackPages(url) {
     if (url.includes('fb.dut.udn.vn')) {
         const insertSurveyButton = () => {

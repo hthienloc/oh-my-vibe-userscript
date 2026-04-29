@@ -19,6 +19,12 @@ const DAY_OFFSET = {
     'Thứ 2': 0, 'Thứ 3': 1, 'Thứ 4': 2, 'Thứ 5': 3, 'Thứ 6': 4, 'Thứ 7': 5, 'Chủ nhật': 6
 };
 
+/**
+ * Combines a Date object and a time string into a new Date object.
+ * @param {Date} date The base date.
+ * @param {string} timeStr The time string (HH:MM).
+ * @returns {Date} The combined date and time.
+ */
 function combineDateAndTime(date, timeStr) {
     const [h, m] = timeStr.split(':').map(Number);
     const newDate = new Date(date);
@@ -26,6 +32,11 @@ function combineDateAndTime(date, timeStr) {
     return newDate;
 }
 
+/**
+ * Formats a Date object into the iCalendar date-time string format.
+ * @param {Date} date The date to format.
+ * @returns {string} The formatted ICS date string.
+ */
 function formatToICSDate(date) {
     return date.getFullYear().toString() +
         (date.getMonth() + 1).toString().padStart(2, '0') +
@@ -34,6 +45,11 @@ function formatToICSDate(date) {
         date.getMinutes().toString().padStart(2, '0') + '00';
 }
 
+/**
+ * Generates and downloads an ICS calendar file.
+ * @param {Object[]} data Array of event objects.
+ * @param {number|string} reminderMinutes Reminder offset in minutes, or 'none'.
+ */
 function downloadICS(data, reminderMinutes) {
     let icsContent = [
         'BEGIN:VCALENDAR',
@@ -89,6 +105,9 @@ function downloadICS(data, reminderMinutes) {
     }, 500);
 }
 
+/**
+ * Extracts class and exam schedules from the page and triggers an ICS export.
+ */
 function exportScheduleToGoogleCalendar() {
     const docAll = document;
     const isHocChecked = docAll.getElementById('export-hoc-cb')?.checked;
@@ -223,6 +242,11 @@ function exportScheduleToGoogleCalendar() {
     downloadICS(events, reminderMinutes);
 }
 
+/**
+ * Main handler for SV (Student Portal) specific features.
+ * @param {string} url The current page URL.
+ * @param {Object|null} savedData User's saved login credentials.
+ */
 export function handleSVPages(url, savedData) {
     // --- 1. Login Page Logic ---
     if (url.includes('PageDangNhap.aspx')) {

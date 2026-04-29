@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.8
+// @version      1.0.9
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
 // @author       hthienloc
 // @match        https://*.youtube.com/*
@@ -37,13 +37,15 @@
     let observer = null;
     let trackingSet = new Set(); // To prevent double counting Reels/Feed videos
 
-    // Minimalist Styles for the Void
+    /**
+     * Injects the required styles for the blackout overlay.
+     */
     const addStyles = () => {
-        if (document.getElementById('void-scroll-styles')) return;
+        if (document.getElementById('vibecode-void-scroll-styles')) return;
         const style = document.createElement('style');
-        style.id = 'void-scroll-styles';
+        style.id = 'vibecode-void-scroll-styles';
         style.textContent = `
-            #void-scroll-overlay {
+            #vibecode-void-scroll-overlay {
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -59,7 +61,7 @@
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 pointer-events: all; /* Block interactions */
             }
-            #void-scroll-message {
+            #vibecode-void-scroll-message {
                 font-size: 24px;
                 font-weight: 300;
                 margin-bottom: 20px;
@@ -68,13 +70,13 @@
                 padding: 0 20px;
                 z-index: 2;
             }
-            #void-scroll-timer {
+            #vibecode-void-scroll-timer {
                 font-size: 48px;
                 font-weight: 100;
                 font-variant-numeric: tabular-nums;
                 z-index: 2;
             }
-            #void-scroll-breath {
+            #vibecode-void-scroll-breath {
                 position: absolute;
                 width: 200px;
                 height: 200px;
@@ -84,7 +86,7 @@
                 z-index: 1;
                 pointer-events: none;
             }
-            #void-scroll-stats {
+            #vibecode-void-scroll-stats {
                 position: absolute;
                 bottom: 20px;
                 font-size: 14px;
@@ -95,7 +97,7 @@
                 0%, 100% { transform: scale(1); opacity: 0.2; }
                 50% { transform: scale(1.5); opacity: 0.6; }
             }
-            body.void-scroll-locked {
+            body.vibecode-void-scroll-locked {
                 overflow: hidden !important;
             }
         `;
@@ -104,17 +106,44 @@
 
     // --- Core Logic ---
 
+    /**
+     * Gets the current watched video count.
+     * @returns {number}
+     */
     const getCount = () => parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
+    
+    /**
+     * Sets the watched video count.
+     * @param {number} c
+     */
     const setCount = (c) => localStorage.setItem(STORAGE_KEY_COUNT, c);
     
+    /**
+     * Gets the current lock expiration time.
+     * @returns {number}
+     */
     const getLockTime = () => parseInt(localStorage.getItem(STORAGE_KEY_LOCK) || '0', 10);
+
+    /**
+     * Sets the lock expiration time.
+     * @param {number} t
+     */
     const setLockTime = (t) => localStorage.setItem(STORAGE_KEY_LOCK, t);
 
+    /**
+     * Returns a string representing today's date for daily statistics.
+     * @returns {string}
+     */
     const getTodayString = () => {
         const d = new Date();
         return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     };
 
+    /**
+     * Gets the number of times the void has been triggered today.
+     * Resets the counter if a new day has started.
+     * @returns {number}
+     */
     const getStatsCount = () => {
         const date = localStorage.getItem(STORAGE_KEY_STATS_DATE);
         const today = getTodayString();
@@ -126,12 +155,19 @@
         return parseInt(localStorage.getItem(STORAGE_KEY_STATS_COUNT) || '0', 10);
     };
 
+    /**
+     * Increments the daily void trigger statistics.
+     * @returns {number} The new count.
+     */
     const incrementStatsCount = () => {
         const count = getStatsCount() + 1;
         localStorage.setItem(STORAGE_KEY_STATS_COUNT, count.toString());
         return count;
     };
 
+    /**
+     * Increments the video watch counter and triggers blackout if limit reached.
+     */
     const incrementCounter = () => {
         const currentCount = getCount();
         const newCount = currentCount + 1;
@@ -143,6 +179,10 @@
         }
     };
 
+    /**
+     * Triggers the blackout overlay.
+     * @param {number|null} existingLockTime 
+     */
     const triggerBlackout = (existingLockTime = null) => {
         let lockUntil = existingLockTime;
         if (!lockUntil) {
@@ -170,28 +210,32 @@
         showOverlay(lockUntil);
     };
 
+    /**
+     * Displays the blackout overlay and handles timing and escape prevention.
+     * @param {number} initialLockUntil The time when the lock expires.
+     */
     const showOverlay = (initialLockUntil) => {
         addStyles();
-        document.body.classList.add('void-scroll-locked');
+        document.body.classList.add('vibecode-void-scroll-locked');
 
         let lockUntil = initialLockUntil;
         const statsCount = getStatsCount();
 
-        let overlay = document.getElementById('void-scroll-overlay');
+        let overlay = document.getElementById('vibecode-void-scroll-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
-            overlay.id = 'void-scroll-overlay';
+            overlay.id = 'vibecode-void-scroll-overlay';
             overlay.innerHTML = `
-                <div id="void-scroll-breath"></div>
-                <div id="void-scroll-message">Time to reflect. Look at the void for a moment.</div>
-                <div id="void-scroll-timer"></div>
-                <div id="void-scroll-stats">You have faced the void ${statsCount} times today.</div>
+                <div id="vibecode-void-scroll-breath"></div>
+                <div id="vibecode-void-scroll-message">Time to reflect. Look at the void for a moment.</div>
+                <div id="vibecode-void-scroll-timer"></div>
+                <div id="vibecode-void-scroll-stats">You have faced the void ${statsCount} times today.</div>
             `;
             document.documentElement.appendChild(overlay); // Append to HTML to ensure it covers everything
         }
 
-        const timerEl = document.getElementById('void-scroll-timer');
-        const messageEl = document.getElementById('void-scroll-message');
+        const timerEl = document.getElementById('vibecode-void-scroll-timer');
+        const messageEl = document.getElementById('vibecode-void-scroll-message');
 
         let lastActivityTime = 0;
         let lastFrameTime = Date.now();
@@ -265,16 +309,23 @@
         };
     };
 
+    /**
+     * Removes the blackout overlay and resets counters.
+     */
     const resetVoid = () => {
         setCount(0);
         setLockTime(0);
-        document.body.classList.remove('void-scroll-locked');
-        const overlay = document.getElementById('void-scroll-overlay');
+        document.body.classList.remove('vibecode-void-scroll-locked');
+        const overlay = document.getElementById('vibecode-void-scroll-overlay');
         if (overlay) overlay.remove();
         if (window._voidScrollCleanup) window._voidScrollCleanup();
     };
 
     // --- Check Lock on Load ---
+    
+    /**
+     * Checks if a lock is currently active on page load.
+     */
     const checkInitialLock = () => {
         const lockUntil = getLockTime();
         if (lockUntil > Date.now()) {
@@ -287,7 +338,9 @@
 
     // --- Platform Specific Trackers ---
 
-    // YouTube: Track URL changes (SPA navigation)
+    /**
+     * Initializes the tracker for YouTube navigation events.
+     */
     const initYouTubeTracker = () => {
         const checkYoutubeNav = () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -307,7 +360,9 @@
         checkYoutubeNav();
     };
 
-    // Facebook: Track Intersection of video elements & src changes
+    /**
+     * Initializes the tracker for Facebook using IntersectionObserver and MutationObserver.
+     */
     const initFacebookTracker = () => {
         const viewTimers = new Map();
 
@@ -411,6 +466,10 @@
 
 
     // --- Initialization ---
+    
+    /**
+     * Entry point for the userscript.
+     */
     const init = () => {
         checkInitialLock();
 

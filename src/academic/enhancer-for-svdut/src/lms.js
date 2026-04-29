@@ -7,6 +7,7 @@ import { sanitizeNode, cleanText, convertImgToBase64 } from './utils.js';
 /**
  * Extract the current question's text + choices, copy to clipboard,
  * and prompt user for the answer index from Gemini.
+ * @param {HTMLButtonElement} btn The button triggering the action.
  */
 async function autoAnswerCurrentQuestion(btn) {
     const queEl = document.querySelector('.que');
@@ -207,6 +208,13 @@ async function autoAnswerCurrentQuestion(btn) {
     setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
 }
 
+/**
+ * Extracts all questions and answers from the quiz page into a Markdown string.
+ * @param {Object} options Extraction options.
+ * @param {boolean} [options.includeAnswers=true] Whether to include answers.
+ * @param {boolean} [options.diagnose=false] Whether to format as a diagnosis report.
+ * @returns {Promise<string>} The generated Markdown string.
+ */
 export async function extractQuiz(options = { includeAnswers: true, diagnose: false }) {
     const questions = document.querySelectorAll('.que');
     
@@ -416,6 +424,11 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
     return md;
 }
 
+/**
+ * Main handler for LMS (Moodle) specific features.
+ * @param {string} url The current page URL.
+ * @param {Object|null} savedData User's saved login credentials.
+ */
 export function handleLMSPages(url, savedData) {
     const loginForm = document.getElementById('login');
 

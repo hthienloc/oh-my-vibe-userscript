@@ -1,3 +1,10 @@
+/**
+ * Sanitizes a DOM node, converting its content to Markdown format.
+ * @param {Node} node The DOM node to sanitize.
+ * @param {Map<string, string>} [imgMap=new Map()] Map of image sources to base64 data.
+ * @param {Object} [context={ inBold: false, inItalic: false }] Formatting context state.
+ * @returns {string} The Markdown representation of the node.
+ */
 export function sanitizeNode(node, imgMap = new Map(), context = { inBold: false, inItalic: false }) {
     if (!node) return '';
     let md = '';
@@ -88,6 +95,11 @@ export function sanitizeNode(node, imgMap = new Map(), context = { inBold: false
     return md;
 }
 
+/**
+ * Cleans extracted text, removing redundant whitespace and specific quiz artifacts.
+ * @param {string|Node} input The string or DOM node to clean.
+ * @returns {string} The cleaned text.
+ */
 export function cleanText(input) {
     if (!input) return '';
     const text = (typeof input === 'string') ? input : (input.innerText ?? input.textContent ?? '');
@@ -104,6 +116,11 @@ export function cleanText(input) {
         .trim();
 }
 
+/**
+ * Converts an image element or URL to a base64 encoded string.
+ * @param {HTMLImageElement|string} imgOrUrl The image element or source URL.
+ * @returns {Promise<string>} The base64 data URL or original URL if conversion fails.
+ */
 export async function convertImgToBase64(imgOrUrl) {
     const fetchAsBase64 = async (url) => {
         try {
