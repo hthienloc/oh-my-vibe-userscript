@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Jules Session & Message Copier (V3.4 Manual Refresh)
 // @namespace    http://tampermonkey.net/
-// @version      3.4
+// @version      3.4.1
 // @description  Full bi-directional bridge with Manual Refresh button and robust state management.
-// @author       Gemini Orchestrator
+// @author       hthienloc
 // @match        https://jules.google.com/session/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=google.com
 // @grant        GM_xmlhttpRequest

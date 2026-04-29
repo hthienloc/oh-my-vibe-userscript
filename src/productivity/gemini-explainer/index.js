@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Gemini Explainer (Everywhere)
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Highlight text to quickly ask Google Gemini to explain it.
+// @author       hthienloc
 // @match        *://*/*
 // @grant        none
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/gemini-explainer.user.js

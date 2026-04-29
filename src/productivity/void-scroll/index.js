@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Void Scroll
 // @namespace    http://tampermonkey.net/
-// @version      1.0.7
+// @version      1.0.8
 // @description  Anti-doom-scrolling script that forces a 30-second blackout after 10 videos on YouTube/Facebook.
-// @author       Vibecode
+// @author       hthienloc
 // @match        https://*.youtube.com/*
 // @match        https://*.facebook.com/*
 // @grant        none
