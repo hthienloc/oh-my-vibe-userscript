@@ -457,7 +457,175 @@ export function handleSVPages(url, savedData) {
         }
     }
 
-    // --- 5. Export Schedule Logic ---
+    // --- 5. GPA Calculator Logic ---
+    if (url.includes('PageKetQuaHocTap.aspx')) {
+        const table = document.querySelector('table.Grid, table#Grid1') || document.querySelector('table');
+        if (table && !document.getElementById('gpa-dashboard-card')) {
+            const headerRow = Array.from(table.rows).find(row => row.textContent.toLowerCase().includes('tín chỉ') || row.textContent.toLowerCase().includes('điểm chữ'));
+            
+            if (headerRow) {
+                let creditColIdx = -1;
+                let letterGradeColIdx = -1;
+                let score10ColIdx = -1;
+
+                Array.from(headerRow.cells).forEach((cell, idx) => {
+                    const text = cell.textContent.trim().toLowerCase();
+                    if (text === 'tc' || text.includes('tín chỉ')) creditColIdx = idx;
+                    if (text === 'điểm chữ' || text === 'điểm tl') letterGradeColIdx = idx;
+                    if (text === 'hệ 10' || text === 'điểm 10' || text === 'điểm') score10ColIdx = idx;
+                });
+
+                if (creditColIdx !== -1 && (letterGradeColIdx !== -1 || score10ColIdx !== -1)) {
+                    let totalCredits = 0;
+                    let totalGPA4Points = 0;
+                    let totalGPA10Points = 0;
+                    
+                    // Variables for tracking semester stats
+                    let currentSemester = null;
+                    let semesters = []; // Array to store objects with {name, credits, gpa4Pts, gpa10Pts}
+
+                    const gradeMap = {
+                        'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0, 'C+': 2.5, 'C': 2.0, 'D+': 1.5, 'D': 1.0, 'F': 0.0
+                    };
+
+                    Array.from(table.rows).slice(headerRow.rowIndex + 1).forEach(row => {
+                        // Check if this row is a semester header (usually a single cell spanning multiple columns with text like "Học kỳ")
+                        if (row.cells.length === 1 || (row.cells.length > 0 && row.cells[0].colSpan > 1)) {
+                            const text = row.cells[0].textContent.trim();
+                            if (text.toLowerCase().includes('học kỳ') || text.toLowerCase().includes('kỳ')) {
+                                currentSemester = {
+                                    name: text,
+                                    credits: 0,
+                                    gpa4Pts: 0,
+                                    gpa10Pts: 0
+                                };
+                                semesters.push(currentSemester);
+                                return;
+                            }
+                        }
+
+                        if (row.cells.length <= Math.max(creditColIdx, letterGradeColIdx, score10ColIdx)) return;
+                        
+                        const creditsText = row.cells[creditColIdx].textContent.trim();
+                        const credits = parseFloat(creditsText);
+                        if (isNaN(credits) || credits === 0) return;
+
+                        let gpa4 = null;
+                        let gpa10 = null;
+
+                        if (letterGradeColIdx !== -1) {
+                            const letterGrade = row.cells[letterGradeColIdx].textContent.trim().toUpperCase();
+                            if (gradeMap.hasOwnProperty(letterGrade)) {
+                                gpa4 = gradeMap[letterGrade];
+                            }
+                        }
+
+                        if (score10ColIdx !== -1) {
+                            const score10Text = row.cells[score10ColIdx].textContent.trim();
+                            const score10 = parseFloat(score10Text);
+                            if (!isNaN(score10)) {
+                                gpa10 = score10;
+                                if (gpa4 === null) {
+                                    if (score10 >= 8.5) gpa4 = 4.0;
+                                    else if (score10 >= 8.0) gpa4 = 3.5;
+                                    else if (score10 >= 7.0) gpa4 = 3.0;
+                                    else if (score10 >= 6.5) gpa4 = 2.5;
+                                    else if (score10 >= 5.5) gpa4 = 2.0;
+                                    else if (score10 >= 5.0) gpa4 = 1.5;
+                                    else if (score10 >= 4.0) gpa4 = 1.0;
+                                    else gpa4 = 0.0;
+                                }
+                            }
+                        }
+
+                        if (gpa4 !== null) {
+                            totalCredits += credits;
+                            totalGPA4Points += (gpa4 * credits);
+                            
+                            if (currentSemester) {
+                                currentSemester.credits += credits;
+                                currentSemester.gpa4Pts += (gpa4 * credits);
+                            }
+
+                            if (gpa10 !== null) {
+                                totalGPA10Points += (gpa10 * credits);
+                                if (currentSemester) {
+                                    currentSemester.gpa10Pts += (gpa10 * credits);
+                                }
+                            }
+                        }
+                    });
+
+                    if (totalCredits > 0) {
+                        const finalGPA4 = (totalGPA4Points / totalCredits).toFixed(2);
+                        const finalGPA10 = totalGPA10Points > 0 ? (totalGPA10Points / totalCredits).toFixed(2) : 'N/A';
+                        
+                        // Find the most recent semester with credits
+                        let lastActiveSemester = null;
+                        for (let i = semesters.length - 1; i >= 0; i--) {
+                            if (semesters[i].credits > 0) {
+                                lastActiveSemester = semesters[i];
+                                break;
+                            }
+                        }
+                        
+                        let semesterStatsHtml = '';
+                        if (lastActiveSemester) {
+                            const semGPA4 = (lastActiveSemester.gpa4Pts / lastActiveSemester.credits).toFixed(2);
+                            const semGPA10 = lastActiveSemester.gpa10Pts > 0 ? (lastActiveSemester.gpa10Pts / lastActiveSemester.credits).toFixed(2) : 'N/A';
+                            
+                            semesterStatsHtml = `
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e3e8ee; display: flex; justify-content: space-around; width: 100%;">
+                                    <div style="text-align: center; width: 100%;">
+                                        <div style="font-size: 13px; color: #6b7280; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;">Học kỳ gần nhất (${lastActiveSemester.name})</div>
+                                        <div style="font-size: 16px; font-weight: 600; color: #4b5563;">
+                                            Tín chỉ: ${lastActiveSemester.credits} &nbsp;|&nbsp; 
+                                            GPA 4.0: <span style="color: #059669;">${semGPA4}</span> &nbsp;|&nbsp; 
+                                            GPA 10.0: <span style="color: #2563eb;">${semGPA10 !== 'N/A' ? semGPA10 : '--'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        const dashboard = document.createElement('div');
+                        dashboard.id = 'gpa-dashboard-card';
+                        dashboard.className = 'GreyBox';
+                        dashboard.style.marginBottom = '20px';
+                        dashboard.style.padding = '15px';
+                        dashboard.style.display = 'flex';
+                        dashboard.style.justifyContent = 'space-around';
+                        dashboard.style.alignItems = 'center';
+                        dashboard.style.flexWrap = 'wrap';
+                        dashboard.style.backgroundColor = '#f9fafc';
+                        dashboard.style.border = '1px solid #e3e8ee';
+                        dashboard.style.borderRadius = '8px';
+                        dashboard.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+
+                        const createStatBlock = (label, value, color) => `
+                            <div style="text-align: center; flex: 1;">
+                                <div style="font-size: 13px; color: #6b7280; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;">${label}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: ${color};">${value}</div>
+                            </div>
+                        `;
+
+                        dashboard.innerHTML = `
+                            <div style="display: flex; justify-content: space-around; width: 100%;">
+                                ${createStatBlock('Tổng tín chỉ', totalCredits, '#374151')}
+                                ${createStatBlock('GPA Tích lũy 4.0', finalGPA4, '#059669')}
+                                ${createStatBlock('GPA Tích lũy 10.0', finalGPA10 !== 'N/A' ? finalGPA10 : '--', '#2563eb')}
+                            </div>
+                            ${semesterStatsHtml}
+                        `;
+
+                        table.parentNode.insertBefore(dashboard, table);
+                    }
+                }
+            }
+        }
+    }
+
+    // --- 6. Export Schedule Logic ---
     if (url.includes('PageLichTH.aspx')) {
         const buttonContainer = document.querySelector('#TTKB_cboHocKy')?.parentElement;
         if (buttonContainer && !document.getElementById('export-calendar-btn')) {

@@ -2,6 +2,7 @@ import { handleSVPages } from './sv.js';
 import { handleLMSPages } from './lms.js';
 import { handleWifiPages } from './wifi.js';
 import { handleGeminiPages } from './gemini.js';
+import { handleFeedbackPages } from './feedback.js';
 
 // 0. Global styles
 const style = document.createElement('style');
@@ -50,6 +51,8 @@ function init() {
         handleLMSPages(url, lmsSavedData);
     } else if (url.includes('wifi.dut.udn.vn')) {
         handleWifiPages(url);
+    } else if (url.includes('fb.dut.udn.vn')) {
+        handleFeedbackPages(url);
     } else if (url.includes('gemini.google.com')) {
         handleGeminiPages();
     }

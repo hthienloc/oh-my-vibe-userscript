@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Prompt Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  A Categorized Quick-Prompt Userscript for Google Gemini
 // @match        https://gemini.google.com/app*
 // @grant        none
@@ -40,39 +40,21 @@
         style.textContent = `
             #vibecode-gemini-prompts-container {
                 display: flex;
-                overflow-x: auto;
+                flex-wrap: wrap;
+                justify-content: center;
                 gap: 12px;
                 padding: 10px 16px;
                 margin-bottom: 8px;
-                scrollbar-width: none; /* Firefox */
-                -ms-overflow-style: none; /* IE/Edge */
                 width: 100%;
                 box-sizing: border-box;
                 align-items: center;
                 background: transparent;
             }
-            #vibecode-gemini-prompts-container::-webkit-scrollbar {
-                display: none; /* Chrome/Safari */
+            .vibecode-category-wrapper {
+                position: relative;
+                display: inline-flex;
             }
-            .vibecode-prompt-group {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .vibecode-prompt-group:not(:last-child)::after {
-                content: '';
-                display: block;
-                width: 1px;
-                height: 20px;
-                background: #e1e1e1;
-                margin: 0 4px;
-            }
-            @media (prefers-color-scheme: dark) {
-                .vibecode-prompt-group:not(:last-child)::after {
-                    background: #333333;
-                }
-            }
-            .vibecode-prompt-chip {
+            .vibecode-category-chip {
                 background: #f5f5f7;
                 border: 1px solid #e1e1e1;
                 border-radius: 16px;
@@ -81,24 +63,91 @@
                 font-size: 13px;
                 font-weight: 500;
                 color: #1a1a1a;
-                cursor: pointer;
+                cursor: default;
                 white-space: nowrap;
                 transition: all 0.2s ease;
+                z-index: 2;
             }
-            .vibecode-prompt-chip:hover {
+            .vibecode-category-wrapper:hover .vibecode-category-chip {
                 background: #e8e8ed;
                 border-color: #d1d1d1;
                 transform: translateY(-1px);
             }
+            .vibecode-popover {
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%) translateY(10px);
+                opacity: 0;
+                visibility: hidden;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                padding: 8px;
+                background: #ffffff;
+                border: 1px solid #e1e1e1;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 10;
+                margin-bottom: 10px;
+                min-width: 120px;
+            }
+            /* Small arrow for popover */
+            .vibecode-popover::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                margin-left: -6px;
+                border-width: 6px;
+                border-style: solid;
+                border-color: #ffffff transparent transparent transparent;
+            }
+            .vibecode-category-wrapper:hover .vibecode-popover {
+                opacity: 1;
+                visibility: visible;
+                transform: translateX(-50%) translateY(0);
+            }
+            .vibecode-prompt-item {
+                background: transparent;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                font-size: 13px;
+                color: #1a1a1a;
+                cursor: pointer;
+                white-space: nowrap;
+                text-align: left;
+                transition: background 0.2s ease;
+            }
+            .vibecode-prompt-item:hover {
+                background: #f0f0f2;
+            }
             @media (prefers-color-scheme: dark) {
-                .vibecode-prompt-chip {
+                .vibecode-category-chip {
                     background: #1c1c1e;
                     border-color: #333333;
                     color: #f5f5f7;
                 }
-                .vibecode-prompt-chip:hover {
+                .vibecode-category-wrapper:hover .vibecode-category-chip {
                     background: #2c2c2e;
                     border-color: #444444;
+                }
+                .vibecode-popover {
+                    background: #1c1c1e;
+                    border-color: #333333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                }
+                .vibecode-popover::after {
+                    border-color: #333333 transparent transparent transparent;
+                }
+                .vibecode-prompt-item {
+                    color: #f5f5f7;
+                }
+                .vibecode-prompt-item:hover {
+                    background: #2c2c2e;
                 }
             }
         `;
@@ -109,27 +158,36 @@
         const container = document.createElement('div');
         container.id = CONTAINER_ID;
 
-        for (let i = 0; i < categories.length; i++) {
-            const category = categories[i];
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'vibecode-prompt-group';
+        categories.forEach(category => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'vibecode-category-wrapper';
 
-            for (let j = 0; j < category.chips.length; j++) {
-                const chipName = category.chips[j];
-                const chip = document.createElement('button');
-                chip.className = 'vibecode-prompt-chip';
-                chip.textContent = chipName;
+            const catChip = document.createElement('div');
+            catChip.className = 'vibecode-category-chip';
+            catChip.textContent = category.name;
+
+            const popover = document.createElement('div');
+            popover.className = 'vibecode-popover';
+
+            category.chips.forEach(chipName => {
+                const item = document.createElement('button');
+                item.className = 'vibecode-prompt-item';
+                item.textContent = chipName;
+                item.title = prompts[chipName];
                 
-                chip.addEventListener('click', function(e) {
+                item.addEventListener('click', function(e) {
                     e.preventDefault();
+                    e.stopPropagation();
                     insertPrompt(prompts[chipName]);
                 });
                 
-                groupDiv.appendChild(chip);
-            }
-            
-            container.appendChild(groupDiv);
-        }
+                popover.appendChild(item);
+            });
+
+            wrapper.appendChild(catChip);
+            wrapper.appendChild(popover);
+            container.appendChild(wrapper);
+        });
 
         return container;
     }
