@@ -27,6 +27,12 @@ This repository serves as a personal hub for various userscripts. By utilizing a
   - *Requirement*: Requires the [Python Relay Server](./src/productivity/jules-helper/server/relay_server.py) to be active.
   - [Install Component](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js)
 
+- **LMS-Gemini Auto Bridge**: Automates sending quiz questions from LMS (lms.dut.udn.vn) to Gemini and auto-fills answers back.
+  - *Features*: Auto-detects server status, shows setup reminders, and fully automates the Q&A workflow.
+  - *Requirement*: Requires the [Bridge Server](./src/productivity/lms-gemini-bridge/server/bridge_server.py) (`python3 bridge_server.py`).
+  - [Install Component](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/lms-gemini-bridge.user.js)
+  - [Documentation](./src/productivity/lms-gemini-bridge/README.md)
+
 ## 🏗️ Architecture & Development
 
 This project uses a modern build system powered by **Bun** to manage modular source code and distribute production-ready userscripts.
