@@ -126,86 +126,289 @@ async function autoAnswerCurrentQuestion(btn) {
         return;
     }
 
-    const prompt_text = 
+    const prompt_text =
         `You are a quiz assistant. strictly follow instructions. Return ONLY valid JSON, no markdown blocks, no explanations, just the literal string starting with { and ending with }.\n\n` +
         `Question: ${questionText}\n\n` +
         promptParts.join('\n\n');
-    
-    // --- Copy to clipboard ---
-    if (typeof GM_setClipboard !== 'undefined') {
-        GM_setClipboard(prompt_text);
-    } else {
-        await navigator.clipboard.writeText(prompt_text);
+
+    // --- Gửi qua Bridge Server hoặc fallback clipboard ---
+    const RELAY_URL = 'http://localhost:8081';
+    let serverAvailable = false;
+
+    // Kiểm tra server
+    try {
+        const res = await fetch(`${RELAY_URL}/status?t=${Date.now()}`, {
+            mode: 'cors',
+            signal: AbortSignal.timeout(2000)
+        });
+        const data = await res.json();
+        serverAvailable = data && data.status === 'running';
+    } catch (e) {
+        serverAvailable = false;
     }
 
-    // --- Open Gemini Tab (only once per session) ---
-    if (!sessionStorage.getItem('svdut_gemini_opened')) {
-        window.open('https://gemini.google.com/app', '_blank');
-        sessionStorage.setItem('svdut_gemini_opened', '1');
-    }
-
-    // --- Prompt user for JSON result ---
-    const userResult = prompt(
-        '✅ ĐÃ COPY CÂU HỎI VÀO CLIPBOARD!\n\n' +
-        '👉 Hãy qua tab Gemini dán (Ctrl+V).\n' +
-        '👉 Nó sẽ xuất ra 1 file JSON kiểu {"answers": ...}.\n' +
-        '👉 Copy chuỗi JSON đó dán vào đây để tự điền:'
-    );
-    
-    if (userResult) {
+    if (serverAvailable) {
+        // Gửi câu hỏi qua server
+        btn.innerText = '🔄 Đang gửi đến Gemini...';
         try {
-            const rawMatch = userResult.match(/\{[\s\S]*\}/);
-            if (!rawMatch) throw new Error("No JSON found");
-            const data = JSON.parse(rawMatch[0]);
+            const res = await fetch(RELAY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'lms_question',
+                    question: prompt_text
+                }),
+                mode: 'cors'
+            });
 
-            targets.forEach(target => {
-                if (target.type === 'choice') {
-                    const arr = Array.isArray(data.answers) ? data.answers : (data.answers !== undefined ? [data.answers] : []);
-                    if (target.isMulti) {
-                        target.options.forEach(o => { if (o.el.checked) o.el.click(); });
-                        arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
-                    } else {
-                        arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
-                    }
-                } else if (target.type === 'match') {
-                    target.mapping.forEach((m, i) => {
-                        const optIdx = data.answers && data.answers[String(i)];
-                        if (optIdx !== undefined && m.optionElements[optIdx]) {
-                            m.selectEl.value = m.optionElements[optIdx].value;
-                            m.selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            if (res.ok) {
+                btn.innerText = '✅ Đã gửi! Đang mở Gemini...';
+
+                // Mở tab Gemini nếu chưa có
+                if (!sessionStorage.getItem('svdut_gemini_opened')) {
+                    window.open('https://gemini.google.com/app', '_blank');
+                    sessionStorage.setItem('svdut_gemini_opened', '1');
+                }
+
+                // Chờ đáp án từ server
+                pollForAnswer(btn, targets);
+            } else {
+                throw new Error('Server error');
+            }
+        } catch (err) {
+            console.error('[Enhancer] Server error:', err);
+            alert('Lỗi kết nối server! Hãy chạy: python3 bridge_server.py');
+            btn.innerText = '🤖 Ask Gemini';
+        }
+    } else {
+        // Fallback: Copy to clipboard như cũ
+        if (typeof GM_setClipboard !== 'undefined') {
+            GM_setClipboard(prompt_text);
+        } else {
+            await navigator.clipboard.writeText(prompt_text);
+        }
+
+        // Hiển thị thông báo nhắc chạy server
+        showServerReminder();
+
+        // --- Open Gemini Tab (only once per session) ---
+        if (!sessionStorage.getItem('svdut_gemini_opened')) {
+            window.open('https://gemini.google.com/app', '_blank');
+            sessionStorage.setItem('svdut_gemini_opened', '1');
+        }
+
+        // --- Prompt user for JSON result ---
+        const userResult = prompt(
+            '✅ ĐÃ COPY CÂU HỎI VÀO CLIPBOARD!\n\n' +
+            '👉 Hãy qua tab Gemini dán (Ctrl+V).\n' +
+            '👉 Nó sẽ xuất ra 1 file JSON kiểu {"answers": ...}.\n' +
+            '👉 Copy chuỗi JSON đó dán vào đây để tự điền:'
+        );
+
+        if (userResult) {
+            try {
+                const rawMatch = userResult.match(/\{[\s\S]*\}/);
+                if (!rawMatch) throw new Error("No JSON found");
+                const data = JSON.parse(rawMatch[0]);
+
+                targets.forEach(target => {
+                    if (target.type === 'choice') {
+                        const arr = Array.isArray(data.answers) ? data.answers : (data.answers !== undefined ? [data.answers] : []);
+                        if (target.isMulti) {
+                            target.options.forEach(o => { if (o.el.checked) o.el.click(); });
+                            arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
+                        } else {
+                            arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
                         }
-                    });
-                } else if (target.type === 'text') {
-                    const val = data.answers && data.answers[String(target.id)];
-                    if (val !== undefined) {
-                        target.el.value = val;
-                        target.el.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                } else if (target.type === 'cloze') {
-                    target.mapping.forEach(m => {
-                        const val = data.answers && data.answers[String(m.id)];
+                    } else if (target.type === 'match') {
+                        target.mapping.forEach((m, i) => {
+                            const optIdx = data.answers && data.answers[String(i)];
+                            if (optIdx !== undefined && m.optionElements[optIdx]) {
+                                m.selectEl.value = m.optionElements[optIdx].value;
+                                m.selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        });
+                    } else if (target.type === 'text') {
+                        const val = data.answers && data.answers[String(target.id)];
                         if (val !== undefined) {
-                            if (m.type === 'select') {
-                                if (m.optionElements[val]) {
-                                    m.el.value = m.optionElements[val].value;
+                            target.el.value = val;
+                            target.el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    } else if (target.type === 'cloze') {
+                        target.mapping.forEach(m => {
+                            const val = data.answers && data.answers[String(m.id)];
+                            if (val !== undefined) {
+                                if (m.type === 'select') {
+                                    if (m.optionElements[val]) {
+                                        m.el.value = m.optionElements[val].value;
+                                        m.el.dispatchEvent(new Event('change', { bubbles: true }));
+                                    }
+                                } else {
+                                    m.el.value = val;
                                     m.el.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
-                            } else {
-                                m.el.value = val;
+                            }
+                        });
+                    }
+                });
+                btn.innerText = `✅ Đã điền xong`;
+            } catch (e) {
+                console.error("Parse Error:", e, userResult);
+                alert("Lỗi: Không thể phân tích JSON từ kết quả của bạn. Vui lòng đảm bảo dán đúng cặp dấu { ... }");
+            }
+        }
+
+        setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
+    }
+}
+
+// Chờ đáp án từ server
+async function pollForAnswer(btn, targets) {
+    const RELAY_URL = 'http://localhost:8081';
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+
+        try {
+            const res = await fetch(`${RELAY_URL}/lms/poll?t=${Date.now()}`, {
+                mode: 'cors',
+                signal: AbortSignal.timeout(3000)
+            });
+            const data = await res.json();
+
+            if (data && data.answer && data.status === 'pending') {
+                clearInterval(pollInterval);
+                processGeminiAnswer(data.answer, btn, targets);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                btn.innerText = '⏱️ Hết thời gian chờ';
+                setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
+            } else {
+                btn.innerText = `⏳ Chờ Gemini... (${attempts}/${maxAttempts})`;
+            }
+        } catch (e) {
+            if (attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                btn.innerText = '❌ Lỗi kết nối';
+                setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
+            }
+        }
+    }, 1000);
+}
+
+// Xử lý đáp án từ Gemini
+function processGeminiAnswer(answerText, btn, targets) {
+    btn.innerText = '📝 Đang xử lý câu trả lời...';
+
+    try {
+        const rawMatch = answerText.match(/\{[\s\S]*\}/);
+        if (!rawMatch) throw new Error("No JSON found");
+        const data = JSON.parse(rawMatch[0]);
+
+        targets.forEach(target => {
+            if (target.type === 'choice') {
+                const arr = Array.isArray(data.answers) ? data.answers : (data.answers !== undefined ? [data.answers] : []);
+                if (target.isMulti) {
+                    target.options.forEach(o => { if (o.el.checked) o.el.click(); });
+                    arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
+                } else {
+                    arr.forEach(idx => { if (target.options[idx]) target.options[idx].el.click(); });
+                }
+            } else if (target.type === 'match') {
+                target.mapping.forEach((m, i) => {
+                    const optIdx = data.answers && data.answers[String(i)];
+                    if (optIdx !== undefined && m.optionElements[optIdx]) {
+                        m.selectEl.value = m.optionElements[optIdx].value;
+                        m.selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            } else if (target.type === 'text') {
+                const val = data.answers && data.answers[String(target.id)];
+                if (val !== undefined) {
+                    target.el.value = val;
+                    target.el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            } else if (target.type === 'cloze') {
+                target.mapping.forEach(m => {
+                    const val = data.answers && data.answers[String(m.id)];
+                    if (val !== undefined) {
+                        if (m.type === 'select') {
+                            if (m.optionElements[val]) {
+                                m.el.value = m.optionElements[val].value;
                                 m.el.dispatchEvent(new Event('change', { bubbles: true }));
                             }
+                        } else {
+                            m.el.value = val;
+                            m.el.dispatchEvent(new Event('change', { bubbles: true }));
                         }
-                    });
-                }
-            });
-            btn.innerText = `✅ Đã điền xong`;
-        } catch (e) {
-            console.error("Parse Error:", e, userResult);
-            alert("Lỗi: Không thể phân tích JSON từ kết quả của bạn. Vui lòng đảm bảo dán đúng cặp dấu { ... }");
-        }
+                    }
+                });
+            }
+        });
+
+        btn.innerText = '✅ Đã điền xong!';
+
+        // Clear server data
+        fetch(RELAY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'clear_all' }),
+            mode: 'cors'
+        }).catch(() => {});
+
+        setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
+    } catch (err) {
+        console.error('Parse Error:', err);
+        alert('Lỗi: Không thể phân tích câu trả lời từ Gemini.\n' + err.message);
+        btn.innerText = '🤖 Ask Gemini';
     }
-    
-    setTimeout(() => { btn.innerText = '🤖 Ask Gemini'; }, 3000);
+}
+
+// Hiển thị thông báo nhắc chạy server
+function showServerReminder() {
+    const existing = document.getElementById('server-reminder-lms');
+    if (existing) existing.remove();
+
+    const reminder = document.createElement('div');
+    reminder.id = 'server-reminder-lms';
+    Object.assign(reminder.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '20px',
+        background: '#fff3cd',
+        color: '#856404',
+        border: '2px solid #ffc107',
+        borderRadius: '8px',
+        zIndex: '2147483647',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        maxWidth: '450px',
+        lineHeight: '1.6'
+    });
+    reminder.innerHTML = `
+        <div style="margin-bottom: 10px;">⚠️ <b>Chưa khởi chạy Bridge Server!</b></div>
+        <div style="font-size: 13px; font-weight: normal; margin-bottom: 12px;">
+            Để tự động hóa, hãy chạy lệnh sau trong terminal:
+        </div>
+        <div style="background: #212529; color: #00ff00; padding: 10px; borderRadius: 4px; font-family: monospace; fontSize: 12px; margin-bottom: 10px;">
+            cd ~/Documents/GitHub/oh-my-vibe-userscript/src/productivity/lms-gemini-bridge/server<br>
+            python3 bridge_server.py
+        </div>
+        <div style="text-align: right;">
+            <button id="reminder-close-lms" style="padding: 5px 15px; background: #856404; color: white; border: none; borderRadius: 4px; cursor: pointer;">Đã hiểu</button>
+        </div>
+    `;
+    document.body.appendChild(reminder);
+
+    document.getElementById('reminder-close-lms').onclick = () => reminder.remove();
+
+    setTimeout(() => {
+        if (reminder.parentNode) reminder.remove();
+    }, 10000);
 }
 
 /**

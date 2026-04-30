@@ -1,6 +1,6 @@
 {
   "name": "enhancer-for-svdut",
-  "version": "1.4.37",
+  "version": "1.4.38",
   "description": "DUT student portal enhancer",
   "type": "module",
   "scripts": {
