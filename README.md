@@ -12,8 +12,9 @@ This repository serves as a personal hub for various userscripts. By utilizing a
 ## 📦 Core Components
 
 ### 🏠 Academic Suite
-- **Enhancer for SVDUT**: A comprehensive tool for the DUT (Da Nang University of Technology) student portal. 
-  - *Features*: Automated WiFi portal login, exam schedule synchronization to Google Calendar, and AI-powered quiz diagnostic reporting.
+- **Enhancer for SVDUT**: A comprehensive tool for the DUT (Da Nang University of Technology) student portal.
+  - *Features*: Automated WiFi portal login, exam schedule synchronization to Google Calendar, AI-powered quiz diagnostic reporting, and **auto-bridge to Gemini** for quiz answering.
+  - *Auto-Bridge*: Sends quiz questions to Gemini and auto-fills answers back via [Bridge Server](./src/productivity/jules-helper/server/relay_server.py) (`python3 bridge_server.py`). Auto-detects server status with setup reminders.
   - [Install Component](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/academic/enhancer-for-svdut.user.js)
 
 ### 📱 Social & Content Tools
@@ -26,12 +27,6 @@ This repository serves as a personal hub for various userscripts. By utilizing a
 - **Jules Bridge Helper**: A bi-directional synchronization bridge between Jules AI and the Gemini web interface.
   - *Requirement*: Requires the [Python Relay Server](./src/productivity/jules-helper/server/relay_server.py) to be active.
   - [Install Component](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/jules-helper.user.js)
-
-- **LMS-Gemini Auto Bridge**: Automates sending quiz questions from LMS (lms.dut.udn.vn) to Gemini and auto-fills answers back.
-  - *Features*: Auto-detects server status, shows setup reminders, and fully automates the Q&A workflow.
-  - *Requirement*: Requires the [Bridge Server](./src/productivity/lms-gemini-bridge/server/bridge_server.py) (`python3 bridge_server.py`).
-  - [Install Component](https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/lms-gemini-bridge.user.js)
-  - [Documentation](./src/productivity/lms-gemini-bridge/README.md)
 
 ## 🏗️ Architecture & Development
 
