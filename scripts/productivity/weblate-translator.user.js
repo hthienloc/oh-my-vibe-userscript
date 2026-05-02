@@ -433,6 +433,24 @@
                 if (lastSection) {
                     hasMore = false;
                 } else {
+                    // Check if we're at the bottom of the page
+                    const scrollPosition = window.scrollY + window.innerHeight;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    
+                    // If we're near the bottom, wait a bit and check again
+                    if (scrollPosition >= documentHeight - 100) {
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        // Re-check if new content loaded
+                        const newScrollPosition = window.scrollY + window.innerHeight;
+                        const newDocumentHeight = document.documentElement.scrollHeight;
+                        
+                        // If still at bottom, no more content
+                        if (newScrollPosition >= newDocumentHeight - 100) {
+                            hasMore = false;
+                            continue;
+                        }
+                    }
+                    
                     // Scroll down to trigger loading more strings
                     window.scrollTo(0, document.body.scrollHeight);
                     await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for new rows to load
