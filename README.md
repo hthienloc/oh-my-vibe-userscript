@@ -44,10 +44,16 @@ This project uses a modern build system powered by **Bun** to manage modular sou
 ```
 
 ### Build & Maintenance
+
 To contribute or build from source:
 
 1.  **Clone & Install**: `bun install`
-2.  **Synchronize**: `npm run build` (This automatically bumps patch versions if changes are detected in `src/`).
+2.  **Setup Auto-Pull Hook**: 
+   ```bash
+   chmod +x .git/hooks/pre-commit
+   ```
+   This automatically pulls `origin/main` before each commit to avoid "branch is behind" errors.
+3.  **Synchronize**: `npm run build` (This automatically bumps patch versions if changes are detected in `src/`).
 3.  **Local Testing**: Point your userscript manager to the files in the `scripts/` directory.
 
 ## ⚖️ License
