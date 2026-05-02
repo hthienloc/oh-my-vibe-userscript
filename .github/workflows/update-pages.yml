@@ -1,4 +1,4 @@
-name: Trigger Pages Update
+name: Update Website
 
 on:
   push:
@@ -6,9 +6,11 @@ on:
     paths:
       - 'scripts/**'
       - 'assets/**'
+      - 'build.js'
+      - 'package.json'
 
 jobs:
-  update-pages:
+  update-website:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,13 +18,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build (scan scripts and update index.html)
+        run: node build.js
+
       - name: Update timestamp in index.html
         run: |
           DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           sed -i "s/<span id=\"last-updated\">.*<\/span>/<span id=\"last-updated\">Last updated: $DATE<\/span>/" index.html
 
-      - name: Commit changes
+      - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Auto-update: trigger Pages rebuild"
+          commit_message: "Auto-update: new scripts added"
           file_pattern: 'index.html'
