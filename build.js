@@ -1,8 +1,8 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 // Scan scripts directory
-const scriptsDir = path.join(__dirname, 'scripts');
+const scriptsDir = path.join(path.dirname(new URL(import.meta.url).pathname), 'scripts');
 const scripts = [];
 
 function scanDir(dir, category) {
@@ -63,7 +63,7 @@ for (const cat of categories) {
 }
 
 // Update index.html
-const indexPath = path.join(__dirname, 'index.html');
+const indexPath = path.join(path.dirname(new URL(import.meta.url).pathname), 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 
 // Replace scripts array
