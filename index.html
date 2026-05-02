@@ -488,7 +488,7 @@
 
                 card.innerHTML = `
                     <div>
-                        <span class="tag">${s.tag}</span>
+                        <span class="tag">${s.tags.join(', ')}</span>
                         <h3 class="script-title" data-script-index="${scripts.indexOf(s)}">${s.name}</h3>
                         <p>${s.description}</p>
                         ${requirementHtml}
