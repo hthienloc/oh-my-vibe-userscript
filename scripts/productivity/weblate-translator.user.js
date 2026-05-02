@@ -154,14 +154,17 @@
             return;
         }
 
-        // Extract and preserve placeholders like {number}, 1{number}, %s, %d, etc.
-        const placeholderPattern = /(\d*\{[^}]+\}|\{[^}]+\}|%[sd])/g;
+        // Clean placeholders: remove digits before {number} like 1{number} -> {number}
+        let cleanedText = text.replace(/(\d+)(\{[^}]+\})/g, '$2');
+
+        // Extract and preserve placeholders like {number}, %s, %d, etc.
+        const placeholderPattern = /\{[^}]+\}|%[sd]/g;
         const placeholders = [];
-        let textForTranslation = text;
         let match;
+        let textForTranslation = cleanedText;
 
         // Find all placeholders
-        while ((match = placeholderPattern.exec(text)) !== null) {
+        while ((match = placeholderPattern.exec(cleanedText)) !== null) {
             placeholders.push({ placeholder: match[0], index: match.index });
         }
 
