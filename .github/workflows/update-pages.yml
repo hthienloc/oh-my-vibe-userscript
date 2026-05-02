@@ -19,7 +19,7 @@ jobs:
       - name: Update timestamp in index.html
         run: |
           DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          sed -i "s/Last updated:.*</span>/Last updated: $DATE</span>/" index.html
+          sed -i "s/Last updated:.*<\\/span>/Last updated: $DATE<\\/span>/" index.html
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
