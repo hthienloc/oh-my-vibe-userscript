@@ -472,7 +472,7 @@
             const filtered = scripts.filter(s => {
                 const searchMatch = s.name.toLowerCase().includes(currentSearch.toLowerCase()) || 
                                     s.description.toLowerCase().includes(currentSearch.toLowerCase());
-                const tagMatch = currentTag === '' || s.tag === currentTag;
+                const tagMatch = currentTag === '' || (s.tags && s.tags.includes(currentTag));
                 return searchMatch && tagMatch;
             });
 
