@@ -361,16 +361,24 @@
 
             let successCount = 0;
             for (const row of rows) {
-                // Get source text from this row
-                const sourceTd = row.querySelector('td.translator:nth-of-type(2) .list-group-item-text[lang="en"]');
-                if (!sourceTd) continue;
+                // Get source text from this row - try multiple selectors
+                let sourceText = null;
 
-                const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
-                    return !s.closest('button') && s.textContent.trim().length > 0;
-                });
+                // Try to get English source from this row
+                const sourceGroup = row.querySelector('.source-language-group');
+                if (sourceGroup) {
+                    const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
+                    if (sourceArea) {
+                        const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
+                            return !s.closest('button') && s.textContent.trim().length > 0;
+                        });
+                        if (span) {
+                            sourceText = span.innerHTML.trim();
+                        }
+                    }
+                }
 
-                if (!span) continue;
-                let sourceText = span.innerHTML.trim();
+                if (!sourceText) continue;
 
                 // Clean placeholders: remove digits before {number}
                 sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
