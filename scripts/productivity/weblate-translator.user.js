@@ -154,8 +154,8 @@
             return;
         }
 
-        // Extract and preserve placeholders like {number}, %s, %d, etc.
-        const placeholderPattern = /\{[^}]+\}|%[sd]/g;
+        // Extract and preserve placeholders like {number}, 1{number}, %s, %d, etc.
+        const placeholderPattern = /(\d*\{[^}]+\}|\{[^}]+\}|%[sd])/g;
         const placeholders = [];
         let textForTranslation = text;
         let match;
