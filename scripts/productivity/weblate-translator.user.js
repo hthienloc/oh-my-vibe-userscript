@@ -351,81 +351,94 @@
         const translateAllBtn = document.createElement('button');
         translateAllBtn.className = 'weblate-btn';
         translateAllBtn.innerHTML = '🔄 Translate All';
-        translateAllBtn.title = 'Dịch tất cả các dòng trong Zen mode';
+        translateAllBtn.title = 'Dịch tất cả các dòng trong Zen mode (auto-load more)';
         translateAllBtn.onclick = async () => {
-            // In Zen mode, rows are <tr> elements with id starting with "row-edit-"
-            const rows = document.querySelectorAll('tr[id^="row-edit-"]');
-            if (rows.length === 0) {
-                alert('Không tìm thấy dòng nào trong Zen mode!');
-                return;
-            }
+            let totalSuccess = 0;
+            let totalRows = 0;
+            let hasMore = true;
 
-            let successCount = 0;
-            for (const row of rows) {
-                // Get source text from row-source-* (not row-edit-*)
-                const sourceRowId = row.id.replace('row-edit-', 'row-source-');
-                const sourceRow = document.getElementById(sourceRowId);
-                if (!sourceRow) continue;
-
-                // Get English source text from this row
-                const sourceTd = sourceRow.querySelector('td.translatetext');
-                if (!sourceTd) continue;
-
-                const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
-                    return !s.closest('button') && s.textContent.trim().length > 0;
-                });
-
-                if (!span) continue;
-                let sourceText = span.innerHTML.trim();
-
-                // First, extract and preserve placeholders like {number}, {text}, %s, %d
-                const placeholderPattern = /\{[^}]+\}|%[sd]/g;
-                const placeholders = [];
-                let match;
-                let textForTranslation = sourceText;
-
-                while ((match = placeholderPattern.exec(sourceText)) !== null) {
-                    placeholders.push({ placeholder: match[0], index: match.index });
+            while (hasMore) {
+                // Get current rows
+                const rows = document.querySelectorAll('tr[id^="row-edit-"]');
+                if (rows.length === 0) {
+                    alert('Không tìm thấy dòng nào trong Zen mode!');
+                    return;
                 }
 
-                // Replace placeholders with markers
-                placeholders.forEach((p, i) => {
-                    textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
-                });
+                totalRows += rows.length;
+                let successCount = 0;
 
-                // Now strip HTML tags (but keep the PH markers)
-                textForTranslation = textForTranslation.replace(/<[^>]+>/g, '');
+                for (const row of rows) {
+                    // Get source text from row-source-* (not row-edit-*)
+                    const sourceRowId = row.id.replace('row-edit-', 'row-source-');
+                    const sourceRow = document.getElementById(sourceRowId);
+                    if (!sourceRow) continue;
 
-                // Also clean: remove digits before {number} pattern (like 1{number} -> {number})
-                textForTranslation = textForTranslation.replace(/\d+\{[^}]+\}/g, (match) => {
-                    return match.replace(/\d+/, '');
-                });
+                    // Get English source text from this row
+                    const sourceTd = sourceRow.querySelector('td.translatetext');
+                    if (!sourceTd) continue;
 
-                try {
-                    const translated = await googleTranslate(textForTranslation, getTargetLang());
-                    if (translated) {
-                        // Restore placeholders
-                        let finalTranslation = translated;
-                        placeholders.forEach((p, i) => {
-                            finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
-                        });
+                    const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
+                        return !s.closest('button') && s.textContent.trim().length > 0;
+                    });
 
-                        // Fill into textarea in this row (row-edit-*)
-                        const textarea = row.querySelector('textarea.translation-editor');
-                        if (textarea) {
-                            textarea.value = finalTranslation;
-                            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                            successCount++;
-                        }
+                    if (!span) continue;
+                    let sourceText = span.innerHTML.trim();
+
+                    // Strip HTML tags but preserve placeholders
+                    sourceText = sourceText.replace(/<\/?span[^>]*>/g, '');
+                    sourceText = sourceText.replace(/<[^>]+>/g, '');
+                    sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
+
+                    // Extract and preserve placeholders like {number}, %s, %d
+                    const placeholderPattern = /\{[^}]+\}|%[sd]/g;
+                    const placeholders = [];
+                    let textForTranslation = sourceText;
+                    let match;
+
+                    while ((match = placeholderPattern.exec(sourceText)) !== null) {
+                        placeholders.push({ placeholder: match[0], index: match.index });
                     }
-                } catch (e) {
-                    // Ignore errors for individual rows
+
+                    // Replace placeholders with markers
+                    placeholders.forEach((p, i) => {
+                        textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
+                    });
+
+                    try {
+                        const translated = await googleTranslate(textForTranslation, getTargetLang());
+                        if (translated) {
+                            // Restore placeholders
+                            let finalTranslation = translated;
+                            placeholders.forEach((p, i) => {
+                                finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
+                            });
+
+                            // Fill into textarea in this row
+                            const textarea = row.querySelector('textarea.translation-editor');
+                            if (textarea) {
+                                textarea.value = finalTranslation;
+                                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                successCount++;
+                                totalSuccess++;
+                            }
+                        }
+                    } catch (e) {
+                        // Ignore errors for individual rows
+                    }
                 }
 
-                // Small delay between translations
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Check if there's "The translation has come to an end"
+                const lastSection = document.querySelector('tr[id^="last-section"]');
+                if (lastSection) {
+                    hasMore = false;
+                } else {
+                    // Scroll down to trigger loading more strings
+                    window.scrollTo(0, document.body.scrollHeight);
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for new rows to load
+                }
             }
-            alert(`Dịch tất cả hoàn tất! Đã dịch ${successCount}/${rows.length} dòng.`);
+            alert(`Dịch tất cả hoàn tất! Đã dịch ${totalSuccess}/${totalRows} dòng.`);
         };
 
         container.appendChild(googleBtn);
