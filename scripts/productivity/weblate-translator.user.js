@@ -154,10 +154,31 @@
             return;
         }
 
+        // Extract and preserve placeholders like {number}, %s, %d, etc.
+        const placeholderPattern = /(\{[^}]+\}|%[sd]|\{\{[^}]+\}\}|\[[^\]]+\])/g;
+        const placeholders = [];
+        let match;
+        let textForTranslation = text;
+
+        while ((match = placeholderPattern.exec(text)) !== null) {
+            placeholders.push({ placeholder: match[0], position: match.index });
+        }
+
+        // Replace placeholders with markers
+        placeholders.forEach((p, i) => {
+            textForTranslation = textForTranslation.replace(p.placeholder, `{{PLACEHOLDER_${i}}}`);
+        });
+
         try {
-            const translated = await googleTranslate(text, getTargetLang());
+            const translated = await googleTranslate(textForTranslation, getTargetLang());
+
             if (translated) {
-                fillTranslation(translated);
+                // Restore placeholders
+                let finalTranslation = translated;
+                placeholders.forEach((p, i) => {
+                    finalTranslation = finalTranslation.replace(`{{PLACEHOLDER_${i}}}`, p.placeholder);
+                });
+                fillTranslation(finalTranslation);
             }
         } catch (err) {
             alert('Lỗi dịch: ' + err.message);
