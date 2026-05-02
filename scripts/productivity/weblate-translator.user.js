@@ -155,28 +155,29 @@
         }
 
         // Extract and preserve placeholders like {number}, %s, %d, etc.
-        const placeholderPattern = /(\{[^}]+\}|%[sd]|\{\{[^}]+\}\}|\[[^\]]+\])/g;
+        const placeholderPattern = /\{[^}]+\}|%[sd]/g;
         const placeholders = [];
-        let match;
         let textForTranslation = text;
+        let match;
 
+        // Find all placeholders
         while ((match = placeholderPattern.exec(text)) !== null) {
-            placeholders.push({ placeholder: match[0], position: match.index });
+            placeholders.push({ placeholder: match[0], index: match.index });
         }
 
-        // Replace placeholders with markers
+        // Replace placeholders with numbered markers
         placeholders.forEach((p, i) => {
-            textForTranslation = textForTranslation.replace(p.placeholder, `{{PLACEHOLDER_${i}}}`);
+            textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
         });
 
         try {
             const translated = await googleTranslate(textForTranslation, getTargetLang());
 
             if (translated) {
-                // Restore placeholders
+                // Restore placeholders in correct order
                 let finalTranslation = translated;
                 placeholders.forEach((p, i) => {
-                    finalTranslation = finalTranslation.replace(`{{PLACEHOLDER_${i}}}`, p.placeholder);
+                    finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
                 });
                 fillTranslation(finalTranslation);
             }
