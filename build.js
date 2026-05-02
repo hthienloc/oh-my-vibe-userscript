@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-// Scan scripts directory
 const scriptsDir = path.join(path.dirname(new URL(import.meta.url).pathname), 'scripts');
 const scripts = [];
 
@@ -17,7 +16,7 @@ function scanDir(dir, category) {
             const content = fs.readFileSync(fullPath, 'utf8');
 
             // Extract UserScript metadata
-            const match = content.match(/\/\/ ==UserScript==\s*([\s\S]*?)\/\/ ==\/UserScript==/);
+            const match = content.match(/\/\/ ==UserScript==([\s\S]*?)\/\/ ==\/UserScript==/);
             if (!match) continue;
 
             const metadata = {};
@@ -42,12 +41,15 @@ function scanDir(dir, category) {
                 icon = metadata.icon;
             }
 
+            // Tags: just use category (folder name)
+            const tags = [category];
+
             scripts.push({
                 name: metadata.name || path.basename(item.name, '.user.js'),
                 description: metadata.description || '',
                 url: `scripts/${category}/${item.name}`,
                 icon: icon,
-                tags: [category, ...(metadata.match || []).map(m => m.replace('*://*/*', 'all').replace(/\./g, ''))]
+                tags: tags
             });
         }
     }
