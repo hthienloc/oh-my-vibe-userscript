@@ -352,40 +352,60 @@
         translateAllBtn.innerHTML = '🔄 Translate All';
         translateAllBtn.title = 'Dịch tất cả các dòng trong Zen mode';
         translateAllBtn.onclick = async () => {
+            // In Zen mode, rows are <tr> elements with id starting with "row-edit-"
             const rows = document.querySelectorAll('tr[id^="row-edit-"]');
-            for (const row of rows) {
-                const textarea = row.querySelector('textarea.translation-editor');
-                const sourceArea = row.querySelector('.list-group-item-text[lang="en"]');
-                if (!textarea || !sourceArea) continue;
+            if (rows.length === 0) {
+                alert('Không tìm thấy dòng nào trong Zen mode!');
+                return;
+            }
 
-                const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
+            let successCount = 0;
+            for (const row of rows) {
+                // Get source text from this row
+                const sourceTd = row.querySelector('td.translator:nth-of-type(2) .list-group-item-text[lang="en"]');
+                if (!sourceTd) continue;
+
+                const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
                     return !s.closest('button') && s.textContent.trim().length > 0;
                 });
 
                 if (!span) continue;
                 let sourceText = span.innerHTML.trim();
 
-                // Clean placeholders
+                // Clean placeholders: remove digits before {number}
                 sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
 
-                // Extract and preserve placeholders
+                // Extract and preserve placeholders like {number}, %s, %d
                 const placeholderPattern = /\{[^}]+\}|%[sd]/g;
                 const placeholders = [];
+                let textForTranslation = sourceText;
                 let match;
-                const textForTranslation = sourceText.replace(placeholderPattern, (match, i) => {
-                    placeholders.push(match);
-                    return `{{PH${placeholders.length-1}}}`;
+
+                while ((match = placeholderPattern.exec(sourceText)) !== null) {
+                    placeholders.push({ placeholder: match[0], index: match.index });
+                }
+
+                // Replace placeholders with markers
+                placeholders.forEach((p, i) => {
+                    textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
                 });
 
                 try {
                     const translated = await googleTranslate(textForTranslation, getTargetLang());
                     if (translated) {
+                        // Restore placeholders
                         let finalTranslation = translated;
                         placeholders.forEach((p, i) => {
-                            finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p);
+                            finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
                         });
-                        textarea.value = finalTranslation;
-                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+                        // Fill into textarea in this row
+                        const textarea = row.querySelector('textarea.translation-editor');
+                        if (textarea) {
+                            textarea.value = finalTranslation;
+                            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                            successCount++;
+                        }
                     }
                 } catch (e) {
                     // Ignore errors for individual rows
@@ -394,7 +414,7 @@
                 // Small delay between translations
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            alert('Dịch tất cả hoàn tất!');
+            alert(`Dịch tất cả hoàn tất! Đã dịch ${successCount}/${rows.length} dòng.`);
         };
 
         container.appendChild(googleBtn);
