@@ -361,24 +361,21 @@
 
             let successCount = 0;
             for (const row of rows) {
-                // Get source text from this row - try multiple selectors
-                let sourceText = null;
+                // Get source text from row-source-* (not row-edit-*)
+                const sourceRowId = row.id.replace('row-edit-', 'row-source-');
+                const sourceRow = document.getElementById(sourceRowId);
+                if (!sourceRow) continue;
 
-                // Try to get English source from this row
-                const sourceGroup = row.querySelector('.source-language-group');
-                if (sourceGroup) {
-                    const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
-                    if (sourceArea) {
-                        const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
-                            return !s.closest('button') && s.textContent.trim().length > 0;
-                        });
-                        if (span) {
-                            sourceText = span.innerHTML.trim();
-                        }
-                    }
-                }
+                // Get English source text from this row
+                const sourceTd = sourceRow.querySelector('td.translatetext');
+                if (!sourceTd) continue;
 
-                if (!sourceText) continue;
+                const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
+                    return !s.closest('button') && s.textContent.trim().length > 0;
+                });
+
+                if (!span) continue;
+                let sourceText = span.innerHTML.trim();
 
                 // Clean placeholders: remove digits before {number}
                 sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
@@ -407,7 +404,7 @@
                             finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
                         });
 
-                        // Fill into textarea in this row
+                        // Fill into textarea in this row (row-edit-*)
                         const textarea = row.querySelector('textarea.translation-editor');
                         if (textarea) {
                             textarea.value = finalTranslation;
