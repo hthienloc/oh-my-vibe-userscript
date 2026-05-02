@@ -19,7 +19,7 @@
 (function () {
     'use strict';
 
-    const TOOLBAR_SELECTOR = '.editor-toolbar';
+    const TOOLBAR_SELECTOR = '.editor-toolbar, .zen-toolbar, .main-content.js-editor .btn-group-settings';
     const CONTAINER_ID = 'weblate-translator-toolbar';
 
     let autoTranslateEnabled = sessionStorage.getItem('weblate-auto-translate') === 'true';
@@ -346,8 +346,60 @@
             }
         };
 
+        // Translate All button for Zen mode
+        const translateAllBtn = document.createElement('button');
+        translateAllBtn.className = 'weblate-btn';
+        translateAllBtn.innerHTML = '🔄 Translate All';
+        translateAllBtn.title = 'Dịch tất cả các dòng trong Zen mode';
+        translateAllBtn.onclick = async () => {
+            const rows = document.querySelectorAll('tr[id^="row-edit-"]');
+            for (const row of rows) {
+                const textarea = row.querySelector('textarea.translation-editor');
+                const sourceArea = row.querySelector('.list-group-item-text[lang="en"]');
+                if (!textarea || !sourceArea) continue;
+
+                const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
+                    return !s.closest('button') && s.textContent.trim().length > 0;
+                });
+
+                if (!span) continue;
+                let sourceText = span.innerHTML.trim();
+
+                // Clean placeholders
+                sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
+
+                // Extract and preserve placeholders
+                const placeholderPattern = /\{[^}]+\}|%[sd]/g;
+                const placeholders = [];
+                let match;
+                const textForTranslation = sourceText.replace(placeholderPattern, (match, i) => {
+                    placeholders.push(match);
+                    return `{{PH${placeholders.length-1}}}`;
+                });
+
+                try {
+                    const translated = await googleTranslate(textForTranslation, getTargetLang());
+                    if (translated) {
+                        let finalTranslation = translated;
+                        placeholders.forEach((p, i) => {
+                            finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p);
+                        });
+                        textarea.value = finalTranslation;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                } catch (e) {
+                    // Ignore errors for individual rows
+                }
+
+                // Small delay between translations
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            alert('Dịch tất cả hoàn tất!');
+        };
+
         container.appendChild(googleBtn);
         container.appendChild(autoBtn);
+        container.appendChild(translateAllBtn);
         toolbar.appendChild(container);
     }
 
