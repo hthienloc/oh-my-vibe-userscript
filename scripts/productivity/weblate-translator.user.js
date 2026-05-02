@@ -358,12 +358,48 @@
             let hasMore = true;
 
             while (hasMore) {
-                // Get current rows
-                const rows = document.querySelectorAll('tr[id^="row-edit-"]');
-                if (rows.length === 0) {
-                    alert('Không tìm thấy dòng nào trong Zen mode!');
-                    return;
+                // Check if there's "The translation has come to an end" FIRST
+                const lastSection = document.querySelector('tr[id^="last-section"]');
+                if (lastSection) {
+                    hasMore = false;
+                    continue;
                 }
+                
+                const editRows = document.querySelectorAll('tr[id^="row-edit-"]');
+                
+                for (const editRow of editRows) {
+                    const editRowId = editRow.id;
+                    const stringId = editRowId.replace('row-edit-', '');
+                    const sourceRowId = `row-source-${stringId}`;
+                    const sourceRow = document.getElementById(sourceRowId);
+                    
+                    if (!sourceRow) continue;
+                    
+                    const sourceText = await extractSourceText(sourceRow);
+                    if (!sourceText) continue;
+                    
+                    const targetTextarea = editRow.querySelector('textarea.translation-editor');
+                    if (!targetTextarea) continue;
+                    
+                    const currentTranslation = targetTextarea.value.trim();
+                    
+                    if (skipTranslated && currentTranslation) {
+                        continue;
+                    }
+                    
+                    const translated = await translateText(sourceText, sourceLang, targetLang);
+                    
+                    if (translated) {
+                        targetTextarea.value = translated;
+                        targetTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+                
+                // Scroll down to trigger loading more strings
+                window.scrollTo(0, document.body.scrollHeight);
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for new rows to load
+            }
 
                 totalRows += rows.length;
                 let successCount = 0;
