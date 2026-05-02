@@ -377,14 +377,11 @@
                 if (!span) continue;
                 let sourceText = span.innerHTML.trim();
 
-                // Clean placeholders: remove digits before {number}
-                sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
-
-                // Extract and preserve placeholders like {number}, %s, %d
+                // First, extract and preserve placeholders like {number}, {text}, %s, %d
                 const placeholderPattern = /\{[^}]+\}|%[sd]/g;
                 const placeholders = [];
-                let textForTranslation = sourceText;
                 let match;
+                let textForTranslation = sourceText;
 
                 while ((match = placeholderPattern.exec(sourceText)) !== null) {
                     placeholders.push({ placeholder: match[0], index: match.index });
@@ -393,6 +390,14 @@
                 // Replace placeholders with markers
                 placeholders.forEach((p, i) => {
                     textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
+                });
+
+                // Now strip HTML tags (but keep the PH markers)
+                textForTranslation = textForTranslation.replace(/<[^>]+>/g, '');
+
+                // Also clean: remove digits before {number} pattern (like 1{number} -> {number})
+                textForTranslation = textForTranslation.replace(/\d+\{[^}]+\}/g, (match) => {
+                    return match.replace(/\d+/, '');
                 });
 
                 try {
