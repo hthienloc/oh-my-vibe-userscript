@@ -1,0 +1,28 @@
+name: Trigger Pages Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'assets/**'
+
+jobs:
+  update-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update timestamp in index.html
+        run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          sed -i "s/Last updated:.*</span>/Last updated: $DATE</span>/" index.html
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-update: trigger Pages rebuild"
+          file_pattern: 'index.html'
