@@ -237,7 +237,8 @@
                         sessionStorage.setItem(cacheKey, JSON.stringify({
                             text: translated,
                             source: sourceText,
-                            time: Date.now()
+                            time: Date.now(),
+                            offset: nextOffset
                         }));
                     }
                 }
@@ -256,17 +257,25 @@
                     try {
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(response.responseText, 'text/html');
-                        const sourceArea = doc.querySelector('.list-group-item-text[lang="en"]');
-                        if (sourceArea) {
-                            const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
-                                return !s.closest('button') && s.textContent.trim().length > 0;
-                            });
-                            if (span) {
-                                resolve(span.innerHTML.trim());
-                                return;
-                            }
+                        // Use same logic as getSourceText() to get English source
+                        const sourceGroup = doc.querySelector('.source-language-group');
+                        if (!sourceGroup) {
+                            resolve(null);
+                            return;
                         }
-                        resolve(null);
+                        const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
+                        if (!sourceArea) {
+                            resolve(null);
+                            return;
+                        }
+                        const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
+                            return !s.closest('button') && s.textContent.trim().length > 0;
+                        });
+                        if (span) {
+                            resolve(span.innerHTML.trim());
+                        } else {
+                            resolve(null);
+                        }
                     } catch (e) {
                         reject(e);
                     }
@@ -286,10 +295,13 @@
         if (cached) {
             try {
                 const data = JSON.parse(cached);
-                const textarea = document.querySelector('textarea.translation-editor');
-                if (textarea && !textarea.value) {
-                    textarea.value = data.text;
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                // Verify this cached translation matches current offset
+                if (data.offset === currentOffset) {
+                    const textarea = document.querySelector('textarea.translation-editor');
+                    if (textarea && !textarea.value) {
+                        textarea.value = data.text;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                 }
             } catch (e) {
                 // Ignore
