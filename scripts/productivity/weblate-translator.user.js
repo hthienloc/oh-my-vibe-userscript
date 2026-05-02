@@ -9,6 +9,7 @@
 // @match        https://translate.flossmanuals.net/*
 // @match        https://hosted.weblate.org/*
 // @match        https://weblate.org/*
+// @match        https://*.fyralabs.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      translate.googleapis.com
 // @updateURL    https://github.com/hthienloc/oh-my-vibe-userscript/raw/main/scripts/productivity/weblate-translator.user.js
