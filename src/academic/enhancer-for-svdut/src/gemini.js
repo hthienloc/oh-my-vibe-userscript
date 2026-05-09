@@ -3,7 +3,7 @@ import { showNotification } from "./utils.js";
  * Logic for automatically sending Gemini's answer back to LMS via bridge server.
  * Specifically handles JSON answer structures from the LMS script.
  */
-const RELAY_URL = 'http://localhost:8081';
+const RELAY_URL = 'http://127.0.0.1:8081';
 
 export function handleGeminiPages() {
     console.log('[Enhancer] Gemini auto-send to LMS enabled.');

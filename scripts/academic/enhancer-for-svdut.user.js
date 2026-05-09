@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.4.45
+// @version      1.4.46
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc
 // @match        https://sv.dut.udn.vn/*
@@ -963,7 +963,7 @@ Bạn có thể dùng Copy Markdown đề để Gemini giải thích rồi tự 
 ` + promptParts.join(`
 
 `);
-  const RELAY_URL2 = "http://localhost:8081";
+  const RELAY_URL2 = "http://127.0.0.1:8081";
   let serverAvailable2 = false;
   try {
     const res = await fetch(`${RELAY_URL2}/status?t=${Date.now()}`, {
@@ -1093,7 +1093,7 @@ Bạn có thể dùng Copy Markdown đề để Gemini giải thích rồi tự 
   }
 }
 async function pollForAnswer(btn, targets) {
-  const RELAY_URL2 = "http://localhost:8081";
+  const RELAY_URL2 = "http://127.0.0.1:8081";
   let attempts = 0;
   const maxAttempts = 60;
   const pollInterval = setInterval(async () => {
@@ -1705,7 +1705,7 @@ function handleLMSPages(url, savedData) {
       }
       const checkBridge = async () => {
         try {
-          const res = await fetch("http://localhost:8081/status", { mode: "cors", signal: AbortSignal.timeout(1000) });
+          const res = await fetch("http://127.0.0.1:8081/status", { mode: "cors", signal: AbortSignal.timeout(2000) });
           const data = await res.json();
           if (data.status === "running") {
             const existing = document.getElementById("server-reminder-lms");
@@ -1879,7 +1879,7 @@ function handleWifiPages(url) {
 }
 
 // src/gemini.js
-var RELAY_URL2 = "http://localhost:8081";
+var RELAY_URL2 = "http://127.0.0.1:8081";
 function handleGeminiPages() {
   console.log("[Enhancer] Gemini auto-send to LMS enabled.");
   const processedTexts = new Set;

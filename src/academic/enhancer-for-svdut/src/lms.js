@@ -187,7 +187,7 @@ async function autoAnswerCurrentQuestion(btn) {
         promptParts.join('\n\n');
 
     // --- Gửi qua Bridge Server hoặc fallback clipboard ---
-    const RELAY_URL = 'http://localhost:8081';
+    const RELAY_URL = 'http://127.0.0.1:8081';
     let serverAvailable = false;
 
     // Kiểm tra server
@@ -328,7 +328,7 @@ async function autoAnswerCurrentQuestion(btn) {
 
 // Chờ đáp án từ server
 async function pollForAnswer(btn, targets) {
-    const RELAY_URL = 'http://localhost:8081';
+    const RELAY_URL = 'http://127.0.0.1:8081';
     let attempts = 0;
     const maxAttempts = 60;
 
@@ -979,7 +979,7 @@ export function handleLMSPages(url, savedData) {
             // Periodic server check
             const checkBridge = async () => {
                 try {
-                    const res = await fetch('http://localhost:8081/status', { mode: 'cors', signal: AbortSignal.timeout(1000) });
+                    const res = await fetch('http://127.0.0.1:8081/status', { mode: 'cors', signal: AbortSignal.timeout(2000) });
                     const data = await res.json();
                     if (data.status === 'running') {
                         const existing = document.getElementById('server-reminder-lms');

@@ -60,6 +60,7 @@ class BridgeHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({'status': 'success'}).encode('utf-8'))
 
     def do_GET(self):
+        print(f"[*] GET request: {self.path}")
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-Type', 'application/json')
