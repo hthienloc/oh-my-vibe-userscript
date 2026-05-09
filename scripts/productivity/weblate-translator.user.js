@@ -67,48 +67,86 @@
         document.head.appendChild(style);
     }
 
-    function getSourceText() {
-        // Only get the CURRENT clean English source text (no diffs)
-        // Must be inside .source-language-group, NOT in .source-change
-        const sourceGroup = document.querySelector('.source-language-group');
-        if (!sourceGroup) return null;
-
-        const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
-        if (!sourceArea) return null;
-
-        // Get the span that is NOT inside a button
-        const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
-            return !s.closest('button') && s.textContent.trim().length > 0;
-        });
-
-        if (span) {
-            // Get innerHTML to preserve BBCode tags like [b]...[/b]
-            let html = span.innerHTML;
-
-            // Remove HTML tags but KEEP BBCode tags
-            // First, temporarily replace BBCode tags with placeholders
-            const bbcodePattern = /\[(\/?[bisu])\]/gi;
-            const bbcodeMatches = [];
-            let match;
-            while ((match = bbcodePattern.exec(html)) !== null) {
-                bbcodeMatches.push(match[0]);
-            }
-
-            // Replace BBCode with placeholders
-            let tempHtml = html.replace(bbcodePattern, '{{BBCode}}');
-
-            // Now strip HTML tags
-            tempHtml = tempHtml.replace(/<[^>]+>/g, '');
-
-            // Restore BBCode tags
-            bbcodeMatches.forEach(bb => {
-                tempHtml = tempHtml.replace('{{BBCode}}', bb);
-            });
-
-            return tempHtml.trim();
+    // Extract source text from a row (works for both single and Zen mode)
+    function getSourceTextFromRow(row) {
+        if (!row) return null;
+        
+        // Try Zen mode structure first (td.translatetext)
+        let sourceTd = row.querySelector('td.translatetext') 
+                        || row.querySelector('td[class*="translatetext"]');
+        
+        if (sourceTd) {
+            // Zen mode
+            const span = Array.from(sourceTd.querySelectorAll('span')).find(s => 
+                !s.closest('button') && s.textContent.trim().length > 0
+            );
+            if (!span) return null;
+            return cleanHtml(span.innerHTML);
         }
-
+        
+        // Non-Zen mode: look for .list-group-item-text[lang="en"] inside .source-language-group
+        const sourceGroup = row.querySelector('.source-language-group') || row;
+        const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
+        
+        if (sourceArea) {
+            const span = Array.from(sourceArea.querySelectorAll('span')).find(s => 
+                !s.closest('button') && s.textContent.trim().length > 0
+            );
+            if (!span) return null;
+            return cleanHtml(span.innerHTML);
+        }
+        
         return null;
+    }
+    
+    // Clean HTML: remove kbd, tags, preserve BBCode, clean placeholders
+    function cleanHtml(html) {
+        // Remove <kbd> elements (shortcut numbers like 1, 2, 3)
+        html = html.replace(/<kbd[^>]*>.*?<\/kbd>/g, '');
+        
+        // Remove HTML tags but preserve BBCode tags
+        const bbcodePattern = /\[(\/?[bisu])\]/gi;
+        const bbcodeMatches = [];
+        let match;
+        while ((match = bbcodePattern.exec(html)) !== null) {
+            bbcodeMatches.push(match[0]);
+        }
+        let tempHtml = html.replace(bbcodePattern, '{{BBCode}}');
+        tempHtml = tempHtml.replace(/<[^>]+>/g, '');
+        bbcodeMatches.forEach(bb => {
+            tempHtml = tempHtml.replace('{{BBCode}}', bb);
+        });
+        
+        // Clean placeholder prefixes like 1{...} -> {...}
+        tempHtml = tempHtml.replace(/(\d+)(\{[^}]+\})/g, '$2');
+        
+        return tempHtml.trim();
+    }
+    
+    // Handle placeholders: extract, replace with markers, restore after translation
+    function processTranslation(text, targetLang) {
+        // Extract placeholders like {number}, %s, %d
+        const placeholderPattern = /\{[^}]+\}|%[sd]/g;
+        const placeholders = [];
+        let textForTranslation = text;
+        let match;
+        
+        while ((match = placeholderPattern.exec(text)) !== null) {
+            placeholders.push(match[0]);
+        }
+        
+        placeholders.forEach((p, i) => {
+            textForTranslation = textForTranslation.replace(p, `{{PH${i}}}`);
+        });
+        
+        return googleTranslate(textForTranslation, targetLang).then(translated => {
+            if (!translated) return null;
+            let finalTranslation = translated;
+            placeholders.forEach((p, i) => {
+                finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p);
+            });
+            return finalTranslation;
+        });
     }
 
     function getTargetLang() {
@@ -118,10 +156,15 @@
 
     function googleTranslate(text, targetLang) {
         return new Promise((resolve, reject) => {
+            let timeoutId = setTimeout(() => {
+                reject(new Error('Request timeout after 10s'));
+            }, 10000); // 10 second timeout
+
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`,
                 onload: function (response) {
+                    clearTimeout(timeoutId);
                     try {
                         const data = JSON.parse(response.responseText);
                         const translated = data[0].map(x => x[0]).join('');
@@ -131,185 +174,47 @@
                     }
                 },
                 onerror: function (err) {
+                    clearTimeout(timeoutId);
                     reject(new Error('Lỗi kết nối: ' + err));
                 }
             });
         });
     }
-
+    
     function fillTranslation(text) {
         const textarea = document.querySelector('textarea.translation-editor');
-        if (!textarea) {
-            alert('Không tìm thấy ô dịch!');
-            return false;
-        }
+        if (!textarea) return false;
         textarea.value = text;
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
         return true;
     }
 
     async function translateAndFill() {
-        const text = getSourceText();
-        if (!text) {
+        // Try Zen mode first (row-source-*)
+        let sourceRow = document.querySelector('tr[id^="row-source-"]');
+        
+        // If not Zen, try single string mode (.source-language-group)
+        if (!sourceRow) {
+            sourceRow = document.querySelector('.source-language-group');
+        }
+        
+        const sourceText = getSourceTextFromRow(sourceRow);
+        
+        if (!sourceText) {
             alert('Không tìm thấy văn bản nguồn!');
             return;
         }
 
-        // Clean placeholders: remove digits before {number} like 1{number} -> {number}
-        let cleanedText = text.replace(/(\d+)(\{[^}]+\})/g, '$2');
-
-        // Extract and preserve placeholders like {number}, %s, %d, etc.
-        const placeholderPattern = /\{[^}]+\}|%[sd]/g;
-        const placeholders = [];
-        let match;
-        let textForTranslation = cleanedText;
-
-        // Find all placeholders
-        while ((match = placeholderPattern.exec(cleanedText)) !== null) {
-            placeholders.push({ placeholder: match[0], index: match.index });
-        }
-
-        // Replace placeholders with numbered markers
-        placeholders.forEach((p, i) => {
-            textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
-        });
-
         try {
-            const translated = await googleTranslate(textForTranslation, getTargetLang());
-
+            const translated = await processTranslation(sourceText, getTargetLang());
             if (translated) {
-                // Restore placeholders in correct order
-                let finalTranslation = translated;
-                placeholders.forEach((p, i) => {
-                    finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
-                });
-                fillTranslation(finalTranslation);
+                fillTranslation(translated);
             }
         } catch (err) {
             alert('Lỗi dịch: ' + err.message);
         }
     }
-
-    function autoTranslate() {
-        if (!autoTranslateEnabled) return;
-        const text = getSourceText();
-        if (text && text !== lastChecksum) {
-            lastChecksum = text;
-            setTimeout(() => translateAndFill(), 500);
-
-            // Pre-translate next 3 offsets
-            preTranslateNext(3);
-        }
-    }
-
-    function getCurrentOffset() {
-        const match = window.location.search.match(/offset=(\d+)/);
-        return match ? parseInt(match[1]) : 1;
-    }
-
-    function getMaxOffset() {
-        const el = document.querySelector('.position-input-editable .input-group-text');
-        if (el) {
-            const match = el.textContent.match(/\/ (\d+)/);
-            if (match) return parseInt(match[1]);
-        }
-        return 27; // fallback
-    }
-
-    async function preTranslateNext(count) {
-        const currentOffset = getCurrentOffset();
-        const maxOffset = getMaxOffset();
-        const baseUrl = window.location.origin + window.location.pathname;
-
-        for (let i = 1; i <= count; i++) {
-            const nextOffset = currentOffset + i;
-            if (nextOffset > maxOffset) break;
-
-            const cacheKey = 'weblate-pretrans-' + nextOffset;
-            if (sessionStorage.getItem(cacheKey)) continue; // Already pre-translated
-
-            try {
-                const url = baseUrl + '?q=state%3A%3Ctranslated&offset=' + nextOffset;
-                const sourceText = await fetchSourceText(url);
-                if (sourceText) {
-                    const targetLang = getTargetLang();
-                    const translated = await googleTranslate(sourceText, targetLang);
-                    if (translated) {
-                        sessionStorage.setItem(cacheKey, JSON.stringify({
-                            text: translated,
-                            source: sourceText,
-                            time: Date.now(),
-                            offset: nextOffset
-                        }));
-                    }
-                }
-            } catch (e) {
-                // Ignore pre-translate errors
-            }
-        }
-    }
-
-    async function fetchSourceText(url) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: url,
-                onload: function(response) {
-                    try {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(response.responseText, 'text/html');
-                        // Use same logic as getSourceText() to get English source
-                        const sourceGroup = doc.querySelector('.source-language-group');
-                        if (!sourceGroup) {
-                            resolve(null);
-                            return;
-                        }
-                        const sourceArea = sourceGroup.querySelector('.list-group-item-text[lang="en"]');
-                        if (!sourceArea) {
-                            resolve(null);
-                            return;
-                        }
-                        const span = Array.from(sourceArea.querySelectorAll('span')).find(s => {
-                            return !s.closest('button') && s.textContent.trim().length > 0;
-                        });
-                        if (span) {
-                            resolve(span.innerHTML.trim());
-                        } else {
-                            resolve(null);
-                        }
-                    } catch (e) {
-                        reject(e);
-                    }
-                },
-                onerror: function(err) {
-                    reject(err);
-                }
-            });
-        });
-    }
-
-    function checkPreTranslated() {
-        if (!autoTranslateEnabled) return;
-        const currentOffset = getCurrentOffset();
-        const cacheKey = 'weblate-pretrans-' + currentOffset;
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) {
-            try {
-                const data = JSON.parse(cached);
-                // Verify this cached translation matches current offset
-                if (data.offset === currentOffset) {
-                    const textarea = document.querySelector('textarea.translation-editor');
-                    if (textarea && !textarea.value) {
-                        textarea.value = data.text;
-                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                }
-            } catch (e) {
-                // Ignore
-            }
-        }
-    }
-
+    
     function addButtons() {
         if (document.getElementById(CONTAINER_ID)) return;
 
@@ -329,22 +234,15 @@
         autoBtn.className = 'weblate-btn';
         autoBtn.innerHTML = `${ICONS.auto} <span>Auto</span>`;
         autoBtn.title = 'Tự động dịch khi chuyển chuỗi (Click để bật/tắt)';
-
+        
         if (autoTranslateEnabled) {
             autoBtn.classList.add('active');
-            autoBtn.title = 'Tự động dịch: BẬT - Click để tắt';
         }
 
         autoBtn.onclick = () => {
             autoTranslateEnabled = !autoTranslateEnabled;
             sessionStorage.setItem('weblate-auto-translate', autoTranslateEnabled);
             autoBtn.classList.toggle('active', autoTranslateEnabled);
-            if (autoTranslateEnabled) {
-                autoBtn.title = 'Tự động dịch: BẬT - Click để tắt';
-                autoTranslate();
-            } else {
-                autoBtn.title = 'Tự động dịch: TẮT - Click để bật';
-            }
         };
 
         // Translate All button for Zen mode
@@ -353,128 +251,81 @@
         translateAllBtn.innerHTML = '🔄 Translate All';
         translateAllBtn.title = 'Dịch tất cả các dòng trong Zen mode (auto-load more)';
         translateAllBtn.onclick = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetLang = urlParams.get('lang') || 'vi';
+            const skipTranslated = true;
+            
             let totalSuccess = 0;
             let totalRows = 0;
-            let hasMore = true;
-
-            while (hasMore) {
-                // Check if there's "The translation has come to an end" FIRST
-                const lastSection = document.querySelector('tr[id^="last-section"]');
-                if (lastSection) {
-                    hasMore = false;
-                    continue;
-                }
-                
-                const editRows = document.querySelectorAll('tr[id^="row-edit-"]');
-                
-                for (const editRow of editRows) {
-                    const editRowId = editRow.id;
-                    const stringId = editRowId.replace('row-edit-', '');
-                    const sourceRowId = `row-source-${stringId}`;
-                    const sourceRow = document.getElementById(sourceRowId);
+            
+            // Change button text
+            translateAllBtn.innerHTML = '⏳ Translating...';
+            translateAllBtn.disabled = true;
+            
+            try {
+                let hasMore = true;
+                while (hasMore) {
+                    const editRows = document.querySelectorAll('tr[id^="row-edit-"]');
+                    totalRows += editRows.length;
                     
-                    if (!sourceRow) continue;
+                    for (const editRow of editRows) {
+                        if (document.activeElement?.tagName === 'TEXTAREA') {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            continue;
+                        }
+                        
+                        const stringId = editRow.id.replace('row-edit-', '');
+                        const sourceRow = document.getElementById(`row-source-${stringId}`);
+                        if (!sourceRow) continue;
+                        
+                        const sourceText = getSourceTextFromRow(sourceRow);
+                        if (!sourceText) continue;
+                        
+                        const targetTextarea = editRow.querySelector('textarea.translation-editor');
+                        if (!targetTextarea) continue;
+                        
+                        if (skipTranslated && targetTextarea.value.trim()) continue;
+                        
+                        try {
+                            const translated = await processTranslation(sourceText, targetLang);
+                            if (translated) {
+                                targetTextarea.value = translated;
+                                targetTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                totalSuccess++;
+                            }
+                        } catch (e) {
+                            console.error('Translation error:', e);
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
                     
-                    const sourceText = await extractSourceText(sourceRow);
-                    if (!sourceText) continue;
+                    // Check for last-section with debounce
+                    if (document.querySelector('#last-section')) {
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+                        if (document.querySelector('#last-section')) {
+                            break; // Confirmed end
+                        }
+                    }
                     
-                    const targetTextarea = editRow.querySelector('textarea.translation-editor');
-                    if (!targetTextarea) continue;
-                    
-                    const currentTranslation = targetTextarea.value.trim();
-                    
-                    if (skipTranslated && currentTranslation) {
+                    if (document.activeElement?.tagName === 'TEXTAREA') {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         continue;
                     }
                     
-                    const translated = await translateText(sourceText, sourceLang, targetLang);
-                    
-                    if (translated) {
-                        targetTextarea.value = translated;
-                        targetTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                }
-                
-                // Scroll down to trigger loading more strings
-                window.scrollTo(0, document.body.scrollHeight);
-                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for new rows to load
-            }
-
-                totalRows += rows.length;
-                let successCount = 0;
-
-                for (const row of rows) {
-                    // Get source text from row-source-* (not row-edit-*)
-                    const sourceRowId = row.id.replace('row-edit-', 'row-source-');
-                    const sourceRow = document.getElementById(sourceRowId);
-                    if (!sourceRow) continue;
-
-                    // Get English source text from this row
-                    const sourceTd = sourceRow.querySelector('td.translatetext');
-                    if (!sourceTd) continue;
-
-                    const span = Array.from(sourceTd.querySelectorAll('span')).find(s => {
-                        return !s.closest('button') && s.textContent.trim().length > 0;
-                    });
-
-                    if (!span) continue;
-                    let sourceText = span.innerHTML.trim();
-
-                    // Strip HTML tags but preserve placeholders
-                    sourceText = sourceText.replace(/<\/?span[^>]*>/g, '');
-                    sourceText = sourceText.replace(/<[^>]+>/g, '');
-                    sourceText = sourceText.replace(/(\d+)(\{[^}]+\})/g, '$2');
-
-                    // Extract and preserve placeholders like {number}, %s, %d
-                    const placeholderPattern = /\{[^}]+\}|%[sd]/g;
-                    const placeholders = [];
-                    let textForTranslation = sourceText;
-                    let match;
-
-                    while ((match = placeholderPattern.exec(sourceText)) !== null) {
-                        placeholders.push({ placeholder: match[0], index: match.index });
-                    }
-
-                    // Replace placeholders with markers
-                    placeholders.forEach((p, i) => {
-                        textForTranslation = textForTranslation.replace(p.placeholder, `{{PH${i}}}`);
-                    });
-
-                    try {
-                        const translated = await googleTranslate(textForTranslation, getTargetLang());
-                        if (translated) {
-                            // Restore placeholders
-                            let finalTranslation = translated;
-                            placeholders.forEach((p, i) => {
-                                finalTranslation = finalTranslation.replace(`{{PH${i}}}`, p.placeholder);
-                            });
-
-                            // Fill into textarea in this row
-                            const textarea = row.querySelector('textarea.translation-editor');
-                            if (textarea) {
-                                textarea.value = finalTranslation;
-                                textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                                successCount++;
-                                totalSuccess++;
-                            }
-                        }
-                    } catch (e) {
-                        // Ignore errors for individual rows
-                    }
-                }
-
-                // Check if there's "The translation has come to an end"
-                const lastSection = document.querySelector('tr[id^="last-section"]');
-                if (lastSection) {
-                    hasMore = false;
-                } else {
-                    // Scroll down to trigger loading more strings
                     window.scrollTo(0, document.body.scrollHeight);
-                    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for new rows to load
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
+            } catch (e) {
+                console.error('Translate All error:', e);
+            } finally {
+                // Always restore button
+                translateAllBtn.innerHTML = '✅ Done!';
+                setTimeout(() => {
+                    translateAllBtn.innerHTML = '🔄 Translate All';
+                    translateAllBtn.disabled = false;
+                }, 2000);
             }
-            alert(`Dịch tất cả hoàn tất! Đã dịch ${totalSuccess}/${totalRows} dòng.`);
         };
 
         container.appendChild(googleBtn);
@@ -487,39 +338,15 @@
         addStyles();
         addButtons();
 
-        if (autoTranslateEnabled) {
-            setTimeout(() => {
-                checkPreTranslated();
-                autoTranslate();
-            }, 1500);
-        }
-
         let lastUrl = location.href;
         new MutationObserver(() => {
             if (location.href !== lastUrl) {
                 lastUrl = location.href;
                 setTimeout(() => {
                     addButtons();
-                    if (autoTranslateEnabled) {
-                        checkPreTranslated();
-                        autoTranslate();
-                    }
                 }, 1000);
             }
         }).observe(document, { subtree: true, childList: true });
-
-        function startSourceObserver() {
-            const sourceEl = document.querySelector('.list-group-item-text');
-            if (sourceEl) {
-                const observer = new MutationObserver(() => {
-                    if (autoTranslateEnabled) autoTranslate();
-                });
-                observer.observe(sourceEl, { childList: true, characterData: true, subtree: true });
-            } else {
-                setTimeout(startSourceObserver, 500);
-            }
-        }
-        startSourceObserver();
     }
 
     if (document.readyState === 'loading') {

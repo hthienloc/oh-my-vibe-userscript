@@ -1,4 +1,4 @@
-import { sanitizeNode, cleanText, convertImgToBase64 } from './utils.js';
+import { sanitizeNode, cleanText, convertImgToBase64, showNotification } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Gemini Auto-Answer (Web Mode)
@@ -117,6 +117,61 @@ async function autoAnswerCurrentQuestion(btn) {
         questionText = cleanText(sanitizeNode(clone, imgMap));
 
         if (mapping.length === 0) return alert('Không tìm thấy ô input.');
+        targets.push({ type: 'cloze', mapping });
+        promptParts.push(`Format required: {"answers": ${JSON.stringify(exampleAnswers)}}`);
+    }
+    else if (queEl.classList.contains('ddwtos')) {
+        const drags = Array.from(queEl.querySelectorAll('.answercontainer .draghome, .answercontainer .drag'));
+        const options = drags.map((drag, i) => {
+            const choiceMatch = drag.className.match(/choice(\d+)/);
+            const choice = choiceMatch ? choiceMatch[1] : (i + 1);
+            const groupMatch = drag.className.match(/group(\d+)/);
+            const group = groupMatch ? groupMatch[1] : '1';
+            const text = drag.innerText.trim();
+            return { index: i, choice, group, text, el: drag };
+        });
+
+        const formulation = queEl.querySelector('.formulation') || queEl.querySelector('.qtext') || queEl;
+        const clone = formulation.cloneNode(true);
+        
+        // Robust drop zone detection
+        let drops = Array.from(queEl.querySelectorAll('span.drop, span.dragdrop, .qtext span[class*="place"]'));
+        
+        // Fallback: search by hidden inputs if no spans found
+        if (drops.length === 0) {
+            const hiddenInputs = Array.from(queEl.querySelectorAll('input[type="hidden"][name*="_p"]'));
+            drops = hiddenInputs.map(inp => inp.closest('span') || inp.parentElement).filter(el => !!el);
+        }
+
+        const mapping = [];
+        const exampleAnswers = {};
+
+        drops.forEach((drop, i) => {
+            const groupMatch = drop.className.match(/group(\d+)/);
+            const group = groupMatch ? groupMatch[1] : '1';
+            const input = drop.querySelector('input[type="hidden"]');
+            
+            if (input) {
+                const groupOptions = options.filter(o => o.group === group);
+                mapping.push({ type: 'drag', input, dropEl: drop, id: i, options });
+                
+                const optsText = groupOptions.map(o => `[${o.index}] ${o.text}`).join('  |  ');
+                promptParts.push(`Input ${i} (Group ${group}): ${optsText}`);
+                exampleAnswers[i] = groupOptions[0]?.index || 0;
+            }
+            
+            // Handle placeholders in clone more robustly
+            // Find the equivalent drop zone in the clone
+            const cloneDrops = clone.querySelectorAll('span.drop, span.dragdrop, span[class*="place"]');
+            if (cloneDrops[i]) {
+                cloneDrops[i].replaceWith(document.createTextNode(` [[Input ${i}]] `));
+            }
+        });
+
+        clone.querySelectorAll('.feedback, .feedbackspan, .yui3-overlay, .icon, .grade, .state, .accesshide').forEach(el => el.remove());
+        questionText = cleanText(sanitizeNode(clone, imgMap));
+
+        if (mapping.length === 0) return alert('Không tìm thấy ô thả (Drop zones).');
         targets.push({ type: 'cloze', mapping });
         promptParts.push(`Format required: {"answers": ${JSON.stringify(exampleAnswers)}}`);
     }
@@ -243,6 +298,15 @@ async function autoAnswerCurrentQuestion(btn) {
                                         m.el.value = m.optionElements[val].value;
                                         m.el.dispatchEvent(new Event('change', { bubbles: true }));
                                     }
+                                } else if (m.type === 'drag') {
+                                    if (m.options[val]) {
+                                        m.input.value = m.options[val].choice;
+                                        m.input.dispatchEvent(new Event('change', { bubbles: true }));
+                                        // Visual update
+                                        m.dropEl.textContent = m.options[val].text;
+                                        m.dropEl.appendChild(m.input);
+                                        m.dropEl.classList.add('placed');
+                                    }
                                 } else {
                                     m.el.value = val;
                                     m.el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -339,6 +403,15 @@ function processGeminiAnswer(answerText, btn, targets) {
                                 m.el.value = m.optionElements[val].value;
                                 m.el.dispatchEvent(new Event('change', { bubbles: true }));
                             }
+                        } else if (m.type === 'drag') {
+                            if (m.options[val]) {
+                                m.input.value = m.options[val].choice;
+                                m.input.dispatchEvent(new Event('change', { bubbles: true }));
+                                // Visual update
+                                m.dropEl.textContent = m.options[val].text;
+                                m.dropEl.appendChild(m.input);
+                                m.dropEl.classList.add('placed');
+                            }
                         } else {
                             m.el.value = val;
                             m.el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -366,49 +439,44 @@ function processGeminiAnswer(answerText, btn, targets) {
     }
 }
 
-// Hiển thị thông báo nhắc chạy server
+// Hiển thị thông báo nhắc chạy server (Inline)
 function showServerReminder() {
-    const existing = document.getElementById('server-reminder-lms');
-    if (existing) existing.remove();
+    const container = document.getElementById('enhancer-buttons-inner') || document.getElementById('markdown-buttons-container');
+    if (!container || document.getElementById('server-reminder-lms')) return;
 
     const reminder = document.createElement('div');
     reminder.id = 'server-reminder-lms';
     Object.assign(reminder.style, {
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        padding: '20px',
+        marginTop: '10px',
+        padding: '12px',
         background: '#fff3cd',
         color: '#856404',
-        border: '2px solid #ffc107',
+        border: '1px solid #ffeeba',
         borderRadius: '8px',
-        zIndex: '2147483647',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        maxWidth: '450px',
-        lineHeight: '1.6'
+        fontSize: '12px',
+        lineHeight: '1.4'
     });
     reminder.innerHTML = `
-        <div style="margin-bottom: 10px;">⚠️ <b>Chưa khởi chạy Bridge Server!</b></div>
-        <div style="font-size: 13px; font-weight: normal; margin-bottom: 12px;">
-            Để tự động hóa, hãy chạy lệnh sau trong terminal:
-        </div>
-        <div style="background: #212529; color: #00ff00; padding: 10px; borderRadius: 4px; font-family: monospace; fontSize: 12px; margin-bottom: 10px;">
-            cd ~/Documents/GitHub/oh-my-vibe-userscript/src/productivity/lms-gemini-bridge/server<br>
-            python3 bridge_server.py
-        </div>
-        <div style="text-align: right;">
-            <button id="reminder-close-lms" style="padding: 5px 15px; background: #856404; color: white; border: none; borderRadius: 4px; cursor: pointer;">Đã hiểu</button>
+        <div style="font-weight: bold; margin-bottom: 5px;">⚠️ Bridge Server chưa chạy!</div>
+        <div style="margin-bottom: 8px;">Để tự động hóa, copy và chạy lệnh này trong terminal:</div>
+        <div style="background: #212529; color: #00ff00; padding: 8px; borderRadius: 4px; font-family: monospace; fontSize: 11px; overflow-x: auto; white-space: nowrap; cursor: pointer;" title="Click to copy">
+            python3 -c "$(curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py)"
         </div>
     `;
-    document.body.appendChild(reminder);
+    
+    const codeEl = reminder.querySelector('div[title="Click to copy"]');
+    codeEl.onclick = () => {
+        if (typeof GM_setClipboard !== 'undefined') {
+            GM_setClipboard(codeEl.innerText.trim());
+        } else {
+            navigator.clipboard.writeText(codeEl.innerText.trim());
+        }
+        const oldBg = codeEl.style.background;
+        codeEl.style.background = '#28a745';
+        setTimeout(() => codeEl.style.background = oldBg, 1000);
+    };
 
-    document.getElementById('reminder-close-lms').onclick = () => reminder.remove();
-
-    setTimeout(() => {
-        if (reminder.parentNode) reminder.remove();
-    }, 10000);
+    container.appendChild(reminder);
 }
 
 /**
@@ -592,6 +660,31 @@ export async function extractQuiz(options = { includeAnswers: true, diagnose: fa
                     if (lines.length > 0) {
                         contentMd += '\n> Correct answer: ' + lines.map(l => `**${l}**`).join('\n> ') + '\n';
                     }
+                }
+            }
+            // Handle Drag and Drop into Text
+            else if (q.classList.contains('ddwtos')) {
+                const qtext = clone.querySelector('.qtext');
+                if (qtext) {
+                    const dropZones = qtext.querySelectorAll('.drop');
+                    dropZones.forEach((dz, i) => {
+                        dz.replaceWith(`[[${i + 1}]]`);
+                    });
+                }
+                
+                contentMd = cleanText(sanitizeNode(clone, imgMap)) + '\n\n';
+
+                const drags = Array.from(q.querySelectorAll('.answercontainer .draghome'));
+                if (drags.length > 0) {
+                    contentMd += '**Choices:**\n';
+                    drags.forEach((drag, i) => {
+                        contentMd += `- [${i + 1}] ${cleanText(sanitizeNode(drag, imgMap))}\n`;
+                    });
+                }
+
+                const rightAnswerEl = q.querySelector('.rightanswer');
+                if (isReview && rightAnswerEl) {
+                    contentMd += `\n\n> Correct Answer: **${cleanText(sanitizeNode(rightAnswerEl, imgMap))}**\n`;
                 }
             }
             // Default handling
@@ -816,22 +909,14 @@ export function handleLMSPages(url, savedData) {
                     try {
                         const breadcrumbs = Array.from(document.querySelectorAll('.breadcrumb-item')).map(item => item.textContent.trim());
                         if (breadcrumbs.length > 0) {
-                            const quizName = breadcrumbs[breadcrumbs.length - 1];
-                            const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || 
-                                               document.querySelector('.breadcrumb-item a[title="Khóa học"]');
-                            let courseName = '';
-                            if (courseLink) {
-                                courseName = courseLink.textContent.trim();
-                            } else if (breadcrumbs.length >= 3) {
-                                courseName = breadcrumbs[2];
+                            let quizName = breadcrumbs[breadcrumbs.length - 1];
+                            const genericNames = ['Summary', 'Review', 'Xem lại', 'Tổng kết', 'Lần thử', 'Action', 'Preview'];
+                            if (genericNames.some(g => quizName.includes(g)) && breadcrumbs.length > 1) {
+                                quizName = breadcrumbs[breadcrumbs.length - 2];
                             }
-                            if (courseName && quizName) {
-                                filename = `${courseName} ${quizName}`;
-                            } else if (quizName) {
-                                filename = quizName;
-                            }
+                            filename = quizName;
                         }
-                        filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, '').replace(/\s+/g, '_').trim();
+                        filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, '').trim();
                     } catch (e) {
                         console.error('Error extracting filename:', e);
                     }
@@ -890,6 +975,25 @@ export function handleLMSPages(url, savedData) {
             } else {
                 targetBtn.parentNode.insertBefore(container, targetBtn);
             }
+
+            // Periodic server check
+            const checkBridge = async () => {
+                try {
+                    const res = await fetch('http://localhost:8081/status', { mode: 'cors', signal: AbortSignal.timeout(1000) });
+                    const data = await res.json();
+                    if (data.status === 'running') {
+                        const existing = document.getElementById('server-reminder-lms');
+                        if (existing) existing.remove();
+                    } else {
+                        showServerReminder();
+                    }
+                } catch (e) {
+                    showServerReminder();
+                }
+            };
+            checkBridge();
+            setInterval(checkBridge, 10000);
+
             return true;
         };
 
@@ -968,22 +1072,14 @@ export function handleLMSPages(url, savedData) {
                     try {
                         const breadcrumbs = Array.from(document.querySelectorAll('.breadcrumb-item')).map(item => item.textContent.trim());
                         if (breadcrumbs.length > 0) {
-                            const quizName = breadcrumbs[breadcrumbs.length - 1];
-                            const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || 
-                                               document.querySelector('.breadcrumb-item a[title="Khóa học"]');
-                            let courseName = '';
-                            if (courseLink) {
-                                courseName = courseLink.textContent.trim();
-                            } else if (breadcrumbs.length >= 3) {
-                                courseName = breadcrumbs[2];
+                            let quizName = breadcrumbs[breadcrumbs.length - 1];
+                            const genericNames = ['Summary', 'Review', 'Xem lại', 'Tổng kết', 'Lần thử', 'Action', 'Preview'];
+                            if (genericNames.some(g => quizName.includes(g)) && breadcrumbs.length > 1) {
+                                quizName = breadcrumbs[breadcrumbs.length - 2];
                             }
-                            if (courseName && quizName) {
-                                filename = `${courseName} ${quizName} (My Answers)`;
-                            } else if (quizName) {
-                                filename = `${quizName} (My Answers)`;
-                            }
+                            filename = quizName;
                         }
-                        filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, '').replace(/\s+/g, '_').trim();
+                        filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, '').trim();
                     } catch (err) { }
                     a.download = `${filename}.md`;
                     a.click();

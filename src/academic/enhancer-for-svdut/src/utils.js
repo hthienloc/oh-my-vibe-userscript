@@ -186,3 +186,39 @@ export async function convertImgToBase64(imgOrUrl) {
 
     return await fetchAsBase64(imgOrUrl);
 }
+
+/**
+ * Displays a temporary toast notification
+ * @param {string} message The message to display.
+ * @param {string} type The type of notification (info, success, error).
+ */
+export function showNotification(message, type) {
+    const id = 'svdut-notification';
+    const existing = document.getElementById(id);
+    if (existing) existing.remove();
+
+    const notif = document.createElement('div');
+    notif.id = id;
+    Object.assign(notif.style, {
+        position: 'fixed',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        padding: '15px 25px',
+        background: type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#2196f3',
+        color: 'white',
+        borderRadius: '8px',
+        zIndex: '2147483647',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        maxWidth: '500px',
+        textAlign: 'center'
+    });
+    notif.textContent = message;
+    document.body.appendChild(notif);
+
+    setTimeout(() => {
+        if (notif.parentNode) notif.remove();
+    }, 5000);
+}

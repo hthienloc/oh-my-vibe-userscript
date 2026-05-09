@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Anti-Toxic & Spoiler Filter
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.0.1
+// @version      1.0.2
 // @description  Monitors the newsfeed and hides posts containing blacklisted keywords.
 // @author       hthienloc
 // @match        https://www.facebook.com/*
@@ -11,8 +11,12 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
+/**
+ * Facebook Anti-Toxic & Spoiler Filter
+ * Monitors the newsfeed and hides posts containing blacklisted keywords.
+ * Updated: 2026-04-29
+ */
+
 
     const STORAGE_KEY = 'vibecode-fb-blacklist';
     let blacklist = JSON.parse(localStorage.getItem(STORAGE_KEY) || '["spoiler", "đề thi", "biến căng"]');

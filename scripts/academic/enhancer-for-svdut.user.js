@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.4.38
+// @version      1.4.44
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc
 // @match        https://sv.dut.udn.vn/*
@@ -779,6 +779,36 @@ async function convertImgToBase64(imgOrUrl) {
   }
   return await fetchAsBase64(imgOrUrl);
 }
+function showNotification(message, type) {
+  const id = "svdut-notification";
+  const existing = document.getElementById(id);
+  if (existing)
+    existing.remove();
+  const notif = document.createElement("div");
+  notif.id = id;
+  Object.assign(notif.style, {
+    position: "fixed",
+    top: "20px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    padding: "15px 25px",
+    background: type === "error" ? "#f44336" : type === "success" ? "#4caf50" : "#2196f3",
+    color: "white",
+    borderRadius: "8px",
+    zIndex: "2147483647",
+    fontSize: "14px",
+    fontWeight: "bold",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+    maxWidth: "500px",
+    textAlign: "center"
+  });
+  notif.textContent = message;
+  document.body.appendChild(notif);
+  setTimeout(() => {
+    if (notif.parentNode)
+      notif.remove();
+  }, 5000);
+}
 
 // src/lms.js
 async function autoAnswerCurrentQuestion(btn) {
@@ -879,6 +909,47 @@ ${optsText}`);
       return alert("Không tìm thấy ô input.");
     targets.push({ type: "cloze", mapping });
     promptParts.push(`Format required: {"answers": ${JSON.stringify(exampleAnswers)}}`);
+  } else if (queEl.classList.contains("ddwtos")) {
+    const drags = Array.from(queEl.querySelectorAll(".answercontainer .draghome, .answercontainer .drag"));
+    const options = drags.map((drag, i) => {
+      const choiceMatch = drag.className.match(/choice(\d+)/);
+      const choice = choiceMatch ? choiceMatch[1] : i + 1;
+      const groupMatch = drag.className.match(/group(\d+)/);
+      const group = groupMatch ? groupMatch[1] : "1";
+      const text = drag.innerText.trim();
+      return { index: i, choice, group, text, el: drag };
+    });
+    const formulation = queEl.querySelector(".formulation") || queEl.querySelector(".qtext") || queEl;
+    const clone = formulation.cloneNode(true);
+    let drops = Array.from(queEl.querySelectorAll('span.drop, span.dragdrop, .qtext span[class*="place"]'));
+    if (drops.length === 0) {
+      const hiddenInputs = Array.from(queEl.querySelectorAll('input[type="hidden"][name*="_p"]'));
+      drops = hiddenInputs.map((inp) => inp.closest("span") || inp.parentElement).filter((el) => !!el);
+    }
+    const mapping = [];
+    const exampleAnswers = {};
+    drops.forEach((drop, i) => {
+      const groupMatch = drop.className.match(/group(\d+)/);
+      const group = groupMatch ? groupMatch[1] : "1";
+      const input = drop.querySelector('input[type="hidden"]');
+      if (input) {
+        const groupOptions = options.filter((o) => o.group === group);
+        mapping.push({ type: "drag", input, dropEl: drop, id: i, options });
+        const optsText = groupOptions.map((o) => `[${o.index}] ${o.text}`).join("  |  ");
+        promptParts.push(`Input ${i} (Group ${group}): ${optsText}`);
+        exampleAnswers[i] = groupOptions[0]?.index || 0;
+      }
+      const cloneDrops = clone.querySelectorAll('span.drop, span.dragdrop, span[class*="place"]');
+      if (cloneDrops[i]) {
+        cloneDrops[i].replaceWith(document.createTextNode(` [[Input ${i}]] `));
+      }
+    });
+    clone.querySelectorAll(".feedback, .feedbackspan, .yui3-overlay, .icon, .grade, .state, .accesshide").forEach((el) => el.remove());
+    questionText = cleanText(sanitizeNode(clone, imgMap));
+    if (mapping.length === 0)
+      return alert("Không tìm thấy ô thả (Drop zones).");
+    targets.push({ type: "cloze", mapping });
+    promptParts.push(`Format required: {"answers": ${JSON.stringify(exampleAnswers)}}`);
   } else {
     alert(`Loại câu hỏi này (ví dụ: Drag & drop) chứa sự kiện phức tạp chưa hỗ trợ Auto-fill qua DOM.
 Bạn có thể dùng Copy Markdown đề để Gemini giải thích rồi tự chọn tay nhé.`);
@@ -893,18 +964,18 @@ Bạn có thể dùng Copy Markdown đề để Gemini giải thích rồi tự 
 
 `);
   const RELAY_URL2 = "http://localhost:8081";
-  let serverAvailable = false;
+  let serverAvailable2 = false;
   try {
     const res = await fetch(`${RELAY_URL2}/status?t=${Date.now()}`, {
       mode: "cors",
       signal: AbortSignal.timeout(2000)
     });
     const data = await res.json();
-    serverAvailable = data && data.status === "running";
+    serverAvailable2 = data && data.status === "running";
   } catch (e) {
-    serverAvailable = false;
+    serverAvailable2 = false;
   }
-  if (serverAvailable) {
+  if (serverAvailable2) {
     btn.innerText = "\uD83D\uDD04 Đang gửi đến Gemini...";
     try {
       const res = await fetch(RELAY_URL2, {
@@ -993,6 +1064,14 @@ Bạn có thể dùng Copy Markdown đề để Gemini giải thích rồi tự 
                   if (m.optionElements[val]) {
                     m.el.value = m.optionElements[val].value;
                     m.el.dispatchEvent(new Event("change", { bubbles: true }));
+                  }
+                } else if (m.type === "drag") {
+                  if (m.options[val]) {
+                    m.input.value = m.options[val].choice;
+                    m.input.dispatchEvent(new Event("change", { bubbles: true }));
+                    m.dropEl.textContent = m.options[val].text;
+                    m.dropEl.appendChild(m.input);
+                    m.dropEl.classList.add("placed");
                   }
                 } else {
                   m.el.value = val;
@@ -1096,6 +1175,14 @@ function processGeminiAnswer(answerText, btn, targets) {
                 m.el.value = m.optionElements[val].value;
                 m.el.dispatchEvent(new Event("change", { bubbles: true }));
               }
+            } else if (m.type === "drag") {
+              if (m.options[val]) {
+                m.input.value = m.options[val].choice;
+                m.input.dispatchEvent(new Event("change", { bubbles: true }));
+                m.dropEl.textContent = m.options[val].text;
+                m.dropEl.appendChild(m.input);
+                m.dropEl.classList.add("placed");
+              }
             } else {
               m.el.value = val;
               m.el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1122,46 +1209,40 @@ function processGeminiAnswer(answerText, btn, targets) {
   }
 }
 function showServerReminder() {
-  const existing = document.getElementById("server-reminder-lms");
-  if (existing)
-    existing.remove();
+  const container = document.getElementById("enhancer-buttons-inner") || document.getElementById("markdown-buttons-container");
+  if (!container || document.getElementById("server-reminder-lms"))
+    return;
   const reminder = document.createElement("div");
   reminder.id = "server-reminder-lms";
   Object.assign(reminder.style, {
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    padding: "20px",
+    marginTop: "10px",
+    padding: "12px",
     background: "#fff3cd",
     color: "#856404",
-    border: "2px solid #ffc107",
+    border: "1px solid #ffeeba",
     borderRadius: "8px",
-    zIndex: "2147483647",
-    fontSize: "14px",
-    fontWeight: "bold",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    maxWidth: "450px",
-    lineHeight: "1.6"
+    fontSize: "12px",
+    lineHeight: "1.4"
   });
   reminder.innerHTML = `
-        <div style="margin-bottom: 10px;">⚠️ <b>Chưa khởi chạy Bridge Server!</b></div>
-        <div style="font-size: 13px; font-weight: normal; margin-bottom: 12px;">
-            Để tự động hóa, hãy chạy lệnh sau trong terminal:
-        </div>
-        <div style="background: #212529; color: #00ff00; padding: 10px; borderRadius: 4px; font-family: monospace; fontSize: 12px; margin-bottom: 10px;">
-            cd ~/Documents/GitHub/oh-my-vibe-userscript/src/productivity/lms-gemini-bridge/server<br>
-            python3 bridge_server.py
-        </div>
-        <div style="text-align: right;">
-            <button id="reminder-close-lms" style="padding: 5px 15px; background: #856404; color: white; border: none; borderRadius: 4px; cursor: pointer;">Đã hiểu</button>
+        <div style="font-weight: bold; margin-bottom: 5px;">⚠️ Bridge Server chưa chạy!</div>
+        <div style="margin-bottom: 8px;">Để tự động hóa, copy và chạy lệnh này trong terminal:</div>
+        <div style="background: #212529; color: #00ff00; padding: 8px; borderRadius: 4px; font-family: monospace; fontSize: 11px; overflow-x: auto; white-space: nowrap; cursor: pointer;" title="Click to copy">
+            python3 -c "$(curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py)"
         </div>
     `;
-  document.body.appendChild(reminder);
-  document.getElementById("reminder-close-lms").onclick = () => reminder.remove();
-  setTimeout(() => {
-    if (reminder.parentNode)
-      reminder.remove();
-  }, 1e4);
+  const codeEl = reminder.querySelector('div[title="Click to copy"]');
+  codeEl.onclick = () => {
+    if (typeof GM_setClipboard !== "undefined") {
+      GM_setClipboard(codeEl.innerText.trim());
+    } else {
+      navigator.clipboard.writeText(codeEl.innerText.trim());
+    }
+    const oldBg = codeEl.style.background;
+    codeEl.style.background = "#28a745";
+    setTimeout(() => codeEl.style.background = oldBg, 1000);
+  };
+  container.appendChild(reminder);
 }
 async function extractQuiz(options = { includeAnswers: true, diagnose: false }) {
   const questions = document.querySelectorAll(".que");
@@ -1336,6 +1417,33 @@ Options: ${Array.from(allOptions).join(", ")}
 > `) + `
 `;
           }
+        }
+      } else if (q.classList.contains("ddwtos")) {
+        const qtext = clone.querySelector(".qtext");
+        if (qtext) {
+          const dropZones = qtext.querySelectorAll(".drop");
+          dropZones.forEach((dz, i) => {
+            dz.replaceWith(`[[${i + 1}]]`);
+          });
+        }
+        contentMd = cleanText(sanitizeNode(clone, imgMap)) + `
+
+`;
+        const drags = Array.from(q.querySelectorAll(".answercontainer .draghome"));
+        if (drags.length > 0) {
+          contentMd += `**Choices:**
+`;
+          drags.forEach((drag, i) => {
+            contentMd += `- [${i + 1}] ${cleanText(sanitizeNode(drag, imgMap))}
+`;
+          });
+        }
+        const rightAnswerEl = q.querySelector(".rightanswer");
+        if (isReview && rightAnswerEl) {
+          contentMd += `
+
+> Correct Answer: **${cleanText(sanitizeNode(rightAnswerEl, imgMap))}**
+`;
         }
       } else {
         let userInputsText = "";
@@ -1537,21 +1645,14 @@ function handleLMSPages(url, savedData) {
           try {
             const breadcrumbs = Array.from(document.querySelectorAll(".breadcrumb-item")).map((item) => item.textContent.trim());
             if (breadcrumbs.length > 0) {
-              const quizName = breadcrumbs[breadcrumbs.length - 1];
-              const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || document.querySelector('.breadcrumb-item a[title="Khóa học"]');
-              let courseName = "";
-              if (courseLink) {
-                courseName = courseLink.textContent.trim();
-              } else if (breadcrumbs.length >= 3) {
-                courseName = breadcrumbs[2];
+              let quizName = breadcrumbs[breadcrumbs.length - 1];
+              const genericNames = ["Summary", "Review", "Xem lại", "Tổng kết", "Lần thử", "Action", "Preview"];
+              if (genericNames.some((g) => quizName.includes(g)) && breadcrumbs.length > 1) {
+                quizName = breadcrumbs[breadcrumbs.length - 2];
               }
-              if (courseName && quizName) {
-                filename = `${courseName} ${quizName}`;
-              } else if (quizName) {
-                filename = quizName;
-              }
+              filename = quizName;
             }
-            filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, "").replace(/\s+/g, "_").trim();
+            filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, "").trim();
           } catch (e2) {
             console.error("Error extracting filename:", e2);
           }
@@ -1602,6 +1703,23 @@ function handleLMSPages(url, savedData) {
       } else {
         targetBtn.parentNode.insertBefore(container, targetBtn);
       }
+      const checkBridge = async () => {
+        try {
+          const res = await fetch("http://localhost:8081/status", { mode: "cors", signal: AbortSignal.timeout(1000) });
+          const data = await res.json();
+          if (data.status === "running") {
+            const existing = document.getElementById("server-reminder-lms");
+            if (existing)
+              existing.remove();
+          } else {
+            showServerReminder();
+          }
+        } catch (e) {
+          showServerReminder();
+        }
+      };
+      checkBridge();
+      setInterval(checkBridge, 1e4);
       return true;
     };
     const injectTimer = setInterval(() => {
@@ -1677,21 +1795,14 @@ function handleLMSPages(url, savedData) {
           try {
             const breadcrumbs = Array.from(document.querySelectorAll(".breadcrumb-item")).map((item) => item.textContent.trim());
             if (breadcrumbs.length > 0) {
-              const quizName = breadcrumbs[breadcrumbs.length - 1];
-              const courseLink = document.querySelector('.breadcrumb-item a[title="Course"]') || document.querySelector('.breadcrumb-item a[title="Khóa học"]');
-              let courseName = "";
-              if (courseLink) {
-                courseName = courseLink.textContent.trim();
-              } else if (breadcrumbs.length >= 3) {
-                courseName = breadcrumbs[2];
+              let quizName = breadcrumbs[breadcrumbs.length - 1];
+              const genericNames = ["Summary", "Review", "Xem lại", "Tổng kết", "Lần thử", "Action", "Preview"];
+              if (genericNames.some((g) => quizName.includes(g)) && breadcrumbs.length > 1) {
+                quizName = breadcrumbs[breadcrumbs.length - 2];
               }
-              if (courseName && quizName) {
-                filename = `${courseName} ${quizName} (My Answers)`;
-              } else if (quizName) {
-                filename = `${quizName} (My Answers)`;
-              }
+              filename = quizName;
             }
-            filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, "").replace(/\s+/g, "_").trim();
+            filename = filename.replace(/[\/\\:*?"<>|\[\]]/g, "").trim();
           } catch (err) {}
           a.download = `${filename}.md`;
           a.click();
@@ -1769,80 +1880,8 @@ function handleWifiPages(url) {
 
 // src/gemini.js
 var RELAY_URL2 = "http://localhost:8081";
-var serverAvailable = null;
-async function checkServer() {
-  try {
-    const res = await fetch(`${RELAY_URL2}/status?t=${Date.now()}`, {
-      mode: "cors",
-      signal: AbortSignal.timeout(2000)
-    });
-    const data = await res.json();
-    serverAvailable = data && data.status === "running";
-    return serverAvailable;
-  } catch (e) {
-    serverAvailable = false;
-    return false;
-  }
-}
-function showServerReminder2() {
-  const existing = document.getElementById("server-reminder-gemini");
-  if (existing)
-    existing.remove();
-  const reminder = document.createElement("div");
-  reminder.id = "server-reminder-gemini";
-  Object.assign(reminder.style, {
-    position: "fixed",
-    top: "20px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    padding: "20px 25px",
-    background: "#fff3cd",
-    color: "#856404",
-    border: "3px solid #ffc107",
-    borderRadius: "12px",
-    zIndex: "2147483647",
-    fontSize: "15px",
-    fontWeight: "bold",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
-    maxWidth: "550px",
-    textAlign: "center",
-    lineHeight: "1.6"
-  });
-  reminder.innerHTML = `
-        <div style="font-size: 18px; margin-bottom: 12px;">⚠️ Chưa khởi chạy Bridge Server!</div>
-        <div style="font-size: 13px; font-weight: normal; margin-bottom: 15px; text-align: left;">
-            Để tự động gửi đáp án về LMS, hãy chạy server trong terminal:
-        </div>
-        <div style="background: #212529; color: #00ff00; padding: 12px 15px; borderRadius: 6px; font-family: monospace; fontSize: 13px; margin-bottom: 12px; text-align: left;">
-            cd ~/Documents/GitHub/oh-my-vibe-userscript/src/productivity/lms-gemini-bridge/server<br>
-            python3 bridge_server.py
-        </div>
-        <div style="font-size: 12px; font-weight: normal; color: #856404; margin-bottom: 10px;">
-            Server sẽ chạy tại <b>http://localhost:8081</b>
-        </div>
-        <button id="reminder-close-gemini" style="padding: 8px 20px; background: #856404; color: white; border: none; borderRadius: 6px; cursor: pointer; fontSize: 13px;">Đã hiểu</button>
-    `;
-  document.body.appendChild(reminder);
-  document.getElementById("reminder-close-gemini").onclick = () => reminder.remove();
-  setTimeout(() => {
-    if (reminder.parentNode)
-      reminder.remove();
-  }, 15000);
-}
 function handleGeminiPages() {
   console.log("[Enhancer] Gemini auto-send to LMS enabled.");
-  checkServer().then((available) => {
-    if (!available) {
-      showServerReminder2();
-    }
-  });
-  setInterval(() => {
-    checkServer().then((available) => {
-      if (!available && serverAvailable !== false) {
-        showServerReminder2();
-      }
-    });
-  }, 30000);
   const processedTexts = new Set;
   const observer = new MutationObserver((mutations) => {
     const targets = document.querySelectorAll('model-response, .message-content, [data-message-author-role="assistant"]');
@@ -1904,35 +1943,6 @@ function copyToClipboard(text) {
   } else {
     navigator.clipboard.writeText(text).catch(() => {});
   }
-}
-function showNotification(message, type) {
-  const existing = document.getElementById("svdut-notification");
-  if (existing)
-    existing.remove();
-  const notif = document.createElement("div");
-  notif.id = "svdut-notification";
-  Object.assign(notif.style, {
-    position: "fixed",
-    top: "20px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    padding: "15px 25px",
-    background: type === "error" ? "#f44336" : type === "success" ? "#4caf50" : "#2196f3",
-    color: "white",
-    borderRadius: "8px",
-    zIndex: "2147483647",
-    fontSize: "14px",
-    fontWeight: "bold",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    maxWidth: "500px",
-    textAlign: "center"
-  });
-  notif.textContent = message;
-  document.body.appendChild(notif);
-  setTimeout(() => {
-    if (notif.parentNode)
-      notif.remove();
-  }, 5000);
 }
 
 // src/feedback.js
