@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enhancer for SVDUT
 // @namespace    https://github.com/hthienloc/oh-my-vibe-userscript
-// @version      1.4.44
+// @version      1.4.45
 // @description  Trang web hỗ trợ sinh viên DUT (sv.dut.udn.vn) trở nên hiện đại và tiện lợi hơn.
 // @author       hthienloc
 // @match        https://sv.dut.udn.vn/*
@@ -1228,7 +1228,7 @@ function showServerReminder() {
         <div style="font-weight: bold; margin-bottom: 5px;">⚠️ Bridge Server chưa chạy!</div>
         <div style="margin-bottom: 8px;">Để tự động hóa, copy và chạy lệnh này trong terminal:</div>
         <div style="background: #212529; color: #00ff00; padding: 8px; borderRadius: 4px; font-family: monospace; fontSize: 11px; overflow-x: auto; white-space: nowrap; cursor: pointer;" title="Click to copy">
-            python3 -c "$(curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py)"
+            curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py | python3
         </div>
     `;
   const codeEl = reminder.querySelector('div[title="Click to copy"]');

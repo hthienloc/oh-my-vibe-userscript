@@ -5,7 +5,11 @@ import sys
 
 PORT = 8081
 # Files to store the state
-DATA_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+try:
+    DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    DATA_DIR = os.getcwd()
+
 INBOX_FILE = os.path.join(DATA_DIR, 'bridge_inbox.json')
 OUTBOX_FILE = os.path.join(DATA_DIR, 'bridge_outbox.json')
 
@@ -93,7 +97,7 @@ class BridgeHandler(http.server.BaseHTTPRequestHandler):
 if __name__ == '__main__':
     print(f"🚀 LMS-Gemini Bridge starting on http://localhost:{PORT}")
     print(f"[*] Quick Start Command:")
-    print(f"    python3 -c \"$(curl -fsSL https://raw.githubusercontent.com/{os.environ.get('USER', 'user')}/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py)\"")
+    print(f"    curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py | python3")
     
     try:
         http.server.HTTPServer(('0.0.0.0', PORT), BridgeHandler).serve_forever()
