@@ -96,12 +96,13 @@ class BridgeHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'message': 'Gemini Bridge Relay is active'}).encode('utf-8'))
 
 if __name__ == '__main__':
-    print(f"🚀 LMS-Gemini Bridge starting on http://localhost:{PORT}")
+    print(f"🚀 LMS-Gemini Bridge starting on http://127.0.0.1:{PORT}")
     print(f"[*] Quick Start Command:")
     print(f"    curl -fsSL https://raw.githubusercontent.com/hthienloc/oh-my-vibe-userscript/main/src/productivity/lms-gemini-bridge/server/bridge_server.py | python3")
     
     try:
-        http.server.HTTPServer(('0.0.0.0', PORT), BridgeHandler).serve_forever()
+        # Force IPv4 binding
+        http.server.HTTPServer(('127.0.0.1', PORT), BridgeHandler).serve_forever()
     except KeyboardInterrupt:
         print("\n[*] Shutting down...")
         sys.exit(0)
