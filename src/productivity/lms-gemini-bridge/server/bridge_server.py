@@ -5,7 +5,7 @@ import sys
 
 PORT = 8081
 # Files to store the state
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
 INBOX_FILE = os.path.join(DATA_DIR, 'bridge_inbox.json')
 OUTBOX_FILE = os.path.join(DATA_DIR, 'bridge_outbox.json')
 
